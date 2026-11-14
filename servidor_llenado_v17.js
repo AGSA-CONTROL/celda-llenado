@@ -21,6 +21,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     return res.end(`<meta charset="utf-8"><title>LLENADO</title><h1>LLENADO</h1><ul>${lista}</ul>`);
   }
+  if (nombre === "sala_eliminada.html") return paginaSalaEliminada(req, res);
   if (!nombre.endsWith(".html")) { res.writeHead(404); return res.end("No encontrado"); }
   fs.readFile(path.join(DIR, nombre), (e, d) => {
     if (e) { res.writeHead(404); return res.end("No encontrado"); }
@@ -28,6 +29,29 @@ const server = http.createServer((req, res) => {
     res.end(d);
   });
 });
+
+/* Página que se ve cuando eliminan la sala en la que estabas: eliges otra y regresas */
+function paginaSalaEliminada(req, res) {
+  const q = new URL(req.url, "http://x").searchParams;
+  const sl = nombreSala(q.get("sala"));
+  let volver = path.basename(q.get("volver") || "");
+  if (!/^[\w-]+\.html$/.test(volver) || !fs.existsSync(path.join(DIR, volver))) volver = "";
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sala eliminada</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0c0f14;color:#eef2f7;font-family:"Segoe UI",system-ui,sans-serif}
+.c{background:#161b23;border:1px solid #2c3544;border-radius:14px;padding:28px;max-width:420px;width:calc(100% - 32px)}h1{font-size:22px;margin:0 0 8px}p{color:#98a3b3;margin:0 0 18px}
+.r{display:flex;gap:8px}input{flex:1;font:inherit;padding:10px;border-radius:10px;border:1px solid #3b4659;background:#0b0e12;color:#eef2f7}
+button{font:inherit;font-weight:700;padding:10px 16px;border-radius:10px;border:0;background:#33c469;color:#06210f;cursor:pointer}</style></head><body>
+<div class="c"><h1>🗑 La sala "${sl}" se eliminó</h1><p>Todo lo que estaba en esa sala se desconectó. Escribe la sala a la que quieres entrar.</p>
+<div class="r"><input id="n" maxlength="20" placeholder="nombre de la sala" value="principal"><button id="b">Entrar</button></div></div>
+<script>
+const limpia = x => String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20);
+try { if (localStorage.getItem("celda_sala") === ${JSON.stringify(sl)}) localStorage.removeItem("celda_sala"); } catch(_){}
+function ir(){ const n = limpia(document.getElementById("n").value) || "principal"; try { localStorage.setItem("celda_sala", n); } catch(_){}
+  location.href = ${JSON.stringify(volver ? "/" + volver : "/")} + "?sala=" + encodeURIComponent(n); }
+document.getElementById("b").onclick = ir; document.getElementById("n").onkeydown = e => { if (e.key === "Enter") ir(); };
+</script></body></html>`);
+}
 
 /* ---------- mensajes ---------- */
 /* SALAS: cada equipo trabaja en su propia sala (su propia celda): su HMI, su tienda y su carro.
@@ -46,7 +70,8 @@ function sala(nombre) {
     tiendas: new Set(), vistas: new Set(), pedidos: new Map(),
     pendientes: new Map(),              // id -> ws de carros ESP32 que piden permiso
     aprobados: new Set(),               // ids de carros con permiso (si se reconectan entran solos)
-    rechazados: new Map()               // id -> hora del rechazo (no vuelve a preguntar en 2 min)
+    rechazados: new Map(),              // id -> hora del rechazo (no vuelve a preguntar en 2 min)
+    vigias: new Set()                   // el letrero "Sala:" de cada página abierta (para avisar si se elimina)
   });
   return salas.get(n);
 }
@@ -99,6 +124,36 @@ function sacarCarro(S, ws) {          // ws deja de ser el carro de la sala (se 
   actualizarAgv(S);
 }
 
+/* ---------- lista de salas y ELIMINAR sala ---------- */
+function listaSalas() {
+  return [...salas.values()].map(S => ({
+    nombre: S.nombre, paginas: S.vigias.size, hmi: !!S.hmi, tiendas: S.tiendas.size,
+    carro_fisico: !!S.agvEsp, pide_permiso: S.pendientes.size
+  })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+const todosVigias = () => { const r = []; salas.forEach(S => S.vigias.forEach(v => r.push(v))); return r; };
+const avisarListaSalas = () => { const o = { tipo: "salas", lista: listaSalas() }; todosVigias().forEach(v => enviar(v, o)); };
+function salaVacia(S) {
+  return !S.hmi && !S.tiendas.size && !S.vistas.size && !S.agvPaginas.length && !S.agvEsp && !S.pendientes.size && !S.vigias.size;
+}
+function limpiarSala(S) { if (salas.get(S.nombre) === S && salaVacia(S)) salas.delete(S.nombre); }
+function eliminarSala(n) {
+  const S = salas.get(n); if (!S) return false;
+  salas.delete(n);                                     // primero se borra: nadie más entra a esta sala vieja
+  S.pedidos.forEach((r, id) => {
+    if (r.ultimo && (r.ultimo.fase === "listo" || r.ultimo.fase === "error")) return;
+    enviar(r.ws, { tipo: "estado", id, fase: "error", msg: "Se eliminó la sala \"" + n + "\". Tu pedido se canceló." });
+  });
+  S.vigias.forEach(v => enviar(v, { tipo: "sala_eliminada", sala: n }));
+  const carros = [S.agvEsp, ...S.pendientes.values()].filter(Boolean);
+  carros.forEach(c => enviar(c, { tipo: "agv_permiso", estado: "fuera", sala: n, msg: "La sala se eliminó." }));
+  setTimeout(() => {
+    [S.hmi, ...S.tiendas, ...S.vistas, ...S.agvPaginas, ...carros, ...S.vigias].forEach(w => { if (w) { w.sala = null; try { w.close(); } catch (_) {} } });
+  }, 300);
+  console.log("[" + n + "] SALA ELIMINADA");
+  return true;
+}
+
 function cerrarPedido(S, id) { setTimeout(() => S.pedidos.delete(id), 10 * 60 * 1000); }
 
 wss.on("connection", (ws, req) => {
@@ -107,6 +162,22 @@ wss.on("connection", (ws, req) => {
   ws.on("message", raw => {
     let m; try { m = JSON.parse(raw); } catch (_) { return; }
     if (!m || typeof m !== "object") return;
+
+    /* El letrero "Sala:" de cada página: vigila su sala, pide la lista y puede eliminar salas */
+    if (m.tipo === "vigilar" && !ws.rol) {
+      const S = ws.sala = sala(m.sala); ws.rol = "vigia"; S.vigias.add(ws);
+      enviar(ws, { tipo: "salas", lista: listaSalas() }); avisarListaSalas();
+      return;
+    }
+    if (ws.rol === "vigia") {
+      if (m.tipo === "salas_lista") enviar(ws, { tipo: "salas", lista: listaSalas() });
+      else if (m.tipo === "eliminar_sala") {
+        const n = nombreSala(m.sala);
+        if (!eliminarSala(n)) enviar(ws, { tipo: "error", msg: "Esa sala ya no existe." });
+        setTimeout(avisarListaSalas, 400);
+      }
+      return;
+    }
 
     if (m.tipo === "hola") {
       if (ws.rol) return;                 // cada conexión dice "hola" una sola vez
@@ -217,6 +288,8 @@ wss.on("connection", (ws, req) => {
 
   ws.on("close", () => {
     const S = ws.sala; if (!S) return;
+    if (ws.rol === "vigia") { S.vigias.delete(ws); limpiarSala(S); avisarListaSalas(); return; }
+    setTimeout(() => { limpiarSala(S); avisarListaSalas(); }, 50);
     if (ws === S.hmi) {                                  // el HMI se cayó: la cola en memoria se perdió
       S.hmi = null; S.ultimaDisp = null;
       S.pedidos.forEach((r, id) => {

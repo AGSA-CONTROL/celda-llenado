@@ -170,7 +170,8 @@ pre.proto{max-height:none}
 .kvs b{font-family:var(--mono);font-size:14px;overflow-wrap:anywhere}
 </style>
 <script>
-/* ===== SALA: cada equipo trabaja en su propia sala (link ...?sala=nombre). Sin ?sala= se usa la última o "principal". ===== */
+/* ===== SALA: cada equipo trabaja en su propia sala (link ...?sala=nombre). Sin ?sala= se usa la última o "principal".
+   El letrero de abajo a la izquierda: ver la sala, cambiarse y ELIMINAR salas. ===== */
 (function(){
   const limpia = x => (String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20));
   let s = ""; try { s = limpia(new URLSearchParams(location.search).get("sala")); } catch(_){}
@@ -183,18 +184,64 @@ pre.proto{max-height:none}
     try { localStorage.setItem("celda_sala", n); } catch(_){}
     const u = new URL(location.href); u.searchParams.set("sala", n); location.href = u.toString();
   };
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const B = "font:inherit;font-weight:600;padding:3px 9px;border:0;border-radius:6px;cursor:pointer;";
+  let ws = null, lista = [], abierto = false, borrar = "";
+  function conectar(){
+    if(!location.protocol.startsWith("http")) return;
+    try { ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host); } catch(_){ return setTimeout(conectar, 4000); }
+    const w = ws;
+    w.onopen = () => w.send(JSON.stringify({ tipo:"vigilar", sala: window.SALA }));
+    w.onmessage = e => {
+      let m; try { m = JSON.parse(e.data); } catch(_){ return; }
+      if(m.tipo === "salas"){ lista = m.lista || []; pintar(); }
+      else if(m.tipo === "sala_eliminada" && m.sala === window.SALA){
+        const pag = location.pathname.split("/").pop() || "";
+        location.replace("/sala_eliminada.html?sala=" + encodeURIComponent(m.sala) + "&volver=" + encodeURIComponent(pag));
+      }
+    };
+    w.onclose = () => { if(ws === w) setTimeout(conectar, 3000); };
+  }
+  function mandar(o){ if(ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+  function pintar(){
+    const p = document.getElementById("salaPanel"); if(!p) return;
+    p.style.display = abierto ? "block" : "none";
+    if(!abierto) return;
+    let h = '<div style="font-weight:700;margin-bottom:6px">Salas abiertas</div>';
+    if(!lista.length) h += '<div style="opacity:.7">Ninguna.</div>';
+    lista.forEach(x => {
+      const det = [x.paginas + " página" + (x.paginas === 1 ? "" : "s"), x.hmi ? "HMI" : "", x.tiendas ? x.tiendas + " tienda" + (x.tiendas === 1 ? "" : "s") : "", x.carro_fisico ? "carro físico" : "", x.pide_permiso ? "carro pidiendo permiso" : ""].filter(Boolean).join(" · ");
+      const mia = x.nombre === window.SALA;
+      h += '<div style="display:flex;gap:6px;align-items:center;padding:6px 0;border-top:1px solid #374151">'
+        + '<div style="flex:1;min-width:0"><b>' + esc(x.nombre) + (mia ? ' (aquí estás)' : '') + '</b><div style="font-weight:400;font-size:12px;opacity:.75">' + esc(det) + '</div></div>';
+      if(borrar === x.nombre){
+        h += '<span style="font-size:12px">¿Seguro? Se desconecta todo.</span><button type="button" data-sib="' + esc(x.nombre) + '" style="' + B + 'background:#e5484d;color:#fff">Sí, eliminar</button><button type="button" data-nob="1" style="' + B + 'background:#e5e7eb;color:#111827">No</button>';
+      } else {
+        if(!mia) h += '<button type="button" data-ir="' + esc(x.nombre) + '" style="' + B + 'background:#e5e7eb;color:#111827">Entrar</button>';
+        h += '<button type="button" data-del="' + esc(x.nombre) + '" style="' + B + 'background:#7f1d1d;color:#fff">🗑 Eliminar</button>';
+      }
+      h += '</div>';
+    });
+    h += '<div style="display:flex;gap:6px;padding-top:8px;border-top:1px solid #374151"><input id="salaInp" maxlength="20" placeholder="otra sala (nombre)" style="font:inherit;flex:1;min-width:0;padding:3px 8px;border-radius:6px;border:0;background:#fff;color:#111827"><button type="button" id="salaOk" style="' + B + 'background:#22c55e;color:#fff">Entrar</button></div>';
+    p.innerHTML = h;
+    p.querySelectorAll("[data-ir]").forEach(b => b.onclick = () => window.cambiarSala(b.dataset.ir));
+    p.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { borrar = b.dataset.del; pintar(); });
+    p.querySelectorAll("[data-nob]").forEach(b => b.onclick = () => { borrar = ""; pintar(); });
+    p.querySelectorAll("[data-sib]").forEach(b => b.onclick = () => { mandar({ tipo:"eliminar_sala", sala: b.dataset.sib }); borrar = ""; });
+    const inp = document.getElementById("salaInp");
+    document.getElementById("salaOk").onclick = () => window.cambiarSala(inp.value);
+    inp.onkeydown = e => { if(e.key === "Enter") window.cambiarSala(inp.value); };
+  }
   function letrero(){
     if(document.getElementById("salaBadge")) return;
     const d = document.createElement("div"); d.id = "salaBadge";
-    d.style.cssText = "position:fixed;left:10px;bottom:40px;z-index:9999;background:#1f2937;color:#fff;font:600 13px system-ui,sans-serif;padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;gap:6px;align-items:center";
-    d.innerHTML = 'Sala: <b id="salaNom"></b> <button type="button" id="salaBtn" style="font:inherit;font-weight:600;padding:2px 8px;border:0;border-radius:6px;cursor:pointer;background:#e5e7eb;color:#111827">Cambiar</button>'
-      + '<span id="salaEdit" style="display:none;gap:4px"><input id="salaInp" maxlength="20" placeholder="nombre" style="font:inherit;width:110px;padding:2px 6px;border-radius:6px;border:0;background:#fff;color:#111827"><button type="button" id="salaOk" style="font:inherit;padding:2px 8px;border:0;border-radius:6px;cursor:pointer;background:#22c55e;color:#fff">OK</button></span>';
+    d.style.cssText = "position:fixed;left:10px;bottom:40px;z-index:9999;background:#1f2937;color:#fff;font:600 13px system-ui,sans-serif;padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.3);max-width:calc(100vw - 20px)";
+    d.innerHTML = '<div id="salaPanel" style="display:none;width:380px;max-width:100%;margin-bottom:8px;max-height:50vh;overflow:auto"></div>'
+      + '<div style="display:flex;gap:6px;align-items:center">Sala: <b id="salaNom"></b> <button type="button" id="salaBtn" style="' + B + 'background:#e5e7eb;color:#111827">Cambiar / Eliminar</button></div>';
     document.body.appendChild(d);
     document.getElementById("salaNom").textContent = window.SALA;
-    const ed = document.getElementById("salaEdit"), inp = document.getElementById("salaInp");
-    document.getElementById("salaBtn").onclick = () => { ed.style.display = ed.style.display === "none" ? "inline-flex" : "none"; inp.value = window.SALA; inp.focus(); inp.select(); };
-    document.getElementById("salaOk").onclick = () => window.cambiarSala(inp.value);
-    inp.onkeydown = e => { if(e.key === "Enter") window.cambiarSala(inp.value); };
+    document.getElementById("salaBtn").onclick = () => { abierto = !abierto; borrar = ""; if(abierto) mandar({ tipo:"salas_lista" }); pintar(); };
+    conectar();
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", letrero); else letrero();
 })();
