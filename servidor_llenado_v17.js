@@ -3,10 +3,14 @@
      - el carro AGV (su propia página)    <->  el HMI
    Uso:  npm install   (una sola vez)   y luego   npm start   (o: node servidor_llenado_v17.js)   */
 const http = require("http"), fs = require("fs"), path = require("path"), os = require("os");
-const { WebSocketServer } = require("ws");
+const { WebSocketServer, WebSocket } = require("ws");
 const dgram = require("dgram");
 const PORT = process.env.PORT || 3000, DIR = __dirname;
-const NUBE = process.env.RENDER_EXTERNAL_URL || "";     // en Render (la nube) trae el link fijo, ej. https://celda-llenado.onrender.com
+const NUBE = process.env.RENDER_EXTERNAL_URL || "";
+/* PUENTE del carro físico: el ESP32 se conecta a ESTA laptop como siempre (misma red WiFi, se encuentra solo)
+   y la laptop pasa sus mensajes al servidor de la nube, donde están el HMI, la tienda y la página del carro.
+   Se activa con:  set PUENTE_NUBE=wss://celda-llenado.onrender.com   (lo hace INICIAR_PUENTE_CARRO.bat) */
+const PUENTE_NUBE = NUBE ? "" : (process.env.PUENTE_NUBE || "");     // en Render (la nube) trae el link fijo, ej. https://celda-llenado.onrender.com
 
 /* ---------- archivos .html ---------- */
 const server = http.createServer((req, res) => {
@@ -80,6 +84,7 @@ wss.on("connection", (ws, req) => {
         else {
           if (agvEsp && agvEsp !== ws) { try { agvEsp.close(); } catch (_) {} }   // el ESP32 se reconectó: la conexión vieja sobra
           agvEsp = ws; avisarVistas({ tipo: "agv", en_linea: true });
+          if (PUENTE_NUBE) abrirPuente();
           console.log("Carro ESP32 conectado desde " + String(req.socket.remoteAddress).replace("::ffff:", ""));
         }
         actualizarAgv();
@@ -115,6 +120,7 @@ wss.on("connection", (ws, req) => {
       if (!AGV_A_HMI.includes(m.tipo)) return;
       if (ws === agv) enviar(hmi, m);                    // al HMI solo le habla el carro activo
       if (ws === agvEsp && vistas.size) avisarVistas(m); // la página en modo "Carro real" siempre ve al ESP32
+      if (ws === agvEsp && puente && puente.readyState === 1) puente.send(JSON.stringify(m));   // y se lo pasa a la nube
     } else if (ws.rol === "agv_vista") {
       if (m.tipo === "agv_ctl" && CTL_VISTA.includes(m.cmd)) {
         if (!agvEsp) return enviar(ws, { tipo: "error", msg: "El carro ESP32 no está conectado al servidor." });
@@ -145,12 +151,38 @@ wss.on("connection", (ws, req) => {
       avisarTiendas(); [agvEsp, ...agvPaginas].forEach(c => enviar(c, { tipo: "hmi", en_linea: false })); avisarVistas({ tipo: "hmi", en_linea: false }); console.log("HMI desconectado");
     } else if (ws.rol === "agv") {
       const k = agvPaginas.indexOf(ws); if (k >= 0) agvPaginas.splice(k, 1);
-      if (ws === agvEsp) { agvEsp = null; avisarVistas({ tipo: "agv", en_linea: false }); console.log("Carro ESP32 desconectado"); }
+      if (ws === agvEsp) { agvEsp = null; avisarVistas({ tipo: "agv", en_linea: false }); console.log("Carro ESP32 desconectado"); cerrarPuente(); }
       actualizarAgv();
     } else if (vistas.delete(ws)) {
     } else if (tiendas.delete(ws)) avisarHmi();
   });
 });
+
+/* ---------- PUENTE: carro ESP32 (aquí, por la red local)  <->  servidor de la nube ---------- */
+let puente = null, puenteReintento = null;
+function abrirPuente() {
+  clearTimeout(puenteReintento);
+  if (!agvEsp || (puente && puente.readyState <= 1)) return;
+  console.log("Puente: conectando el carro con la nube (" + PUENTE_NUBE + ")…");
+  let p;
+  try { p = new WebSocket(PUENTE_NUBE); } catch (e) { console.log("Puente: dirección no válida: " + e.message); return; }
+  puente = p;
+  p.on("open", () => { p.send(JSON.stringify({ tipo: "hola", rol: "agv" })); console.log("Puente: el carro ya está en línea en la nube."); });
+  p.on("message", raw => {                            // órdenes del HMI / de la página del carro -> al ESP32
+    let m; try { m = JSON.parse(raw); } catch (_) { return; }
+    if (m && typeof m === "object") enviar(agvEsp, m);
+  });
+  p.on("close", () => {
+    if (puente === p) puente = null;
+    if (agvEsp) { console.log("Puente: se cortó la conexión con la nube, reintentando…"); puenteReintento = setTimeout(abrirPuente, 3000); }
+  });
+  p.on("error", e => console.log("Puente: " + e.message + " (¿la laptop tiene internet?)"));
+}
+function cerrarPuente() {
+  clearTimeout(puenteReintento);
+  if (puente) { const p = puente; puente = null; try { p.close(); } catch (_) {} }
+}
+setInterval(() => { if (puente && puente.readyState === 1) { try { puente.ping(); } catch (_) {} } }, 25000);
 
 /* ---------- el carro ESP32 encuentra este servidor SOLO ----------
    Cada 2 s se avisa por la red WiFi (UDP 3333): "CELDA_LLENADO,<puerto>". El ESP32 escucha ese aviso y
@@ -183,6 +215,7 @@ server.listen(PORT, () => {
     console.log(`\nServidor listo en la NUBE (v17). Link fijo:\n  HMI:       ${NUBE}/HMI_Llenado_v17.html\n  Tienda:    ${NUBE}/Tienda_LaCosecha_v17.html\n  Carro AGV: ${NUBE}/AGV_Carro_v17.html\n  En el panel del ESP32, en "Servidor", escribe: ${NUBE.replace(/^https?:\/\//, "")}  puerto 443`);
     return;
   }
+  if (PUENTE_NUBE) console.log(`\nMODO PUENTE: el carro ESP32 se conecta a esta laptop y se pasa a ${PUENTE_NUBE}\n  Abre el HMI, la tienda y el carro desde el link de la nube (no desde localhost).`);
   console.log(`\nServidor listo (v17).\n  HMI (en esta laptop):  http://localhost:${PORT}/HMI_Llenado_v17.html`);
   Object.values(os.networkInterfaces()).flat().filter(i => i && i.family === "IPv4" && !i.internal).forEach(i => {
     console.log(`  Tienda (otra laptop o tablet):  http://${i.address}:${PORT}/Tienda_LaCosecha_v17.html`);
