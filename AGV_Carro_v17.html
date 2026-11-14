@@ -51,6 +51,14 @@ h2{margin:0 0 4px;font-size:24px}
 .grp{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
 .grp h3{margin:0 0 12px;font-size:12px;letter-spacing:1.6px;color:var(--muted);text-transform:uppercase;display:flex;align-items:center;gap:8px}
 .grp h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--yellow)}
+.btn.green{background:var(--green);border-color:var(--green);color:#06210f}
+.permCard .permItem{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:var(--inset);border:1px solid var(--border2);margin-top:8px;flex-wrap:wrap}
+.permCard .permItem b{flex:1;min-width:120px}
+.permCard .permItem small{display:block;color:var(--muted);font-weight:500}
+.permCard .permItem .btn{padding:7px 12px;flex:0 0 auto}
+#permAviso{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:9998;background:#1d2a1f;border:2px solid var(--green);color:var(--text);border-radius:12px;padding:12px 16px;box-shadow:0 6px 24px rgba(0,0,0,.5);display:flex;gap:10px;align-items:center;max-width:94vw;width:max-content;flex-wrap:wrap;justify-content:center}
+#permAviso[hidden]{display:none}
+#permAviso .btn{padding:8px 14px}
 .btn{padding:11px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--panel2);font-weight:700;cursor:pointer}
 .btn:hover:not(:disabled){border-color:var(--muted)}
 .btn:disabled{opacity:.4;cursor:default}
@@ -161,6 +169,36 @@ pre.proto{max-height:none}
 .kvs small{display:block;color:var(--muted);font-size:11px;margin-bottom:2px}
 .kvs b{font-family:var(--mono);font-size:14px;overflow-wrap:anywhere}
 </style>
+<script>
+/* ===== SALA: cada equipo trabaja en su propia sala (link ...?sala=nombre). Sin ?sala= se usa la última o "principal". ===== */
+(function(){
+  const limpia = x => (String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20));
+  let s = ""; try { s = limpia(new URLSearchParams(location.search).get("sala")); } catch(_){}
+  if(!s){ try { s = limpia(localStorage.getItem("celda_sala")); } catch(_){} }
+  if(!s) s = "principal";
+  try { localStorage.setItem("celda_sala", s); } catch(_){}
+  window.SALA = s;
+  window.cambiarSala = function(n){
+    n = limpia(n); if(!n) return;
+    try { localStorage.setItem("celda_sala", n); } catch(_){}
+    const u = new URL(location.href); u.searchParams.set("sala", n); location.href = u.toString();
+  };
+  function letrero(){
+    if(document.getElementById("salaBadge")) return;
+    const d = document.createElement("div"); d.id = "salaBadge";
+    d.style.cssText = "position:fixed;left:10px;bottom:40px;z-index:9999;background:#1f2937;color:#fff;font:600 13px system-ui,sans-serif;padding:6px 10px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;gap:6px;align-items:center";
+    d.innerHTML = 'Sala: <b id="salaNom"></b> <button type="button" id="salaBtn" style="font:inherit;font-weight:600;padding:2px 8px;border:0;border-radius:6px;cursor:pointer;background:#e5e7eb;color:#111827">Cambiar</button>'
+      + '<span id="salaEdit" style="display:none;gap:4px"><input id="salaInp" maxlength="20" placeholder="nombre" style="font:inherit;width:110px;padding:2px 6px;border-radius:6px;border:0;background:#fff;color:#111827"><button type="button" id="salaOk" style="font:inherit;padding:2px 8px;border:0;border-radius:6px;cursor:pointer;background:#22c55e;color:#fff">OK</button></span>';
+    document.body.appendChild(d);
+    document.getElementById("salaNom").textContent = window.SALA;
+    const ed = document.getElementById("salaEdit"), inp = document.getElementById("salaInp");
+    document.getElementById("salaBtn").onclick = () => { ed.style.display = ed.style.display === "none" ? "inline-flex" : "none"; inp.value = window.SALA; inp.focus(); inp.select(); };
+    document.getElementById("salaOk").onclick = () => window.cambiarSala(inp.value);
+    inp.onkeydown = e => { if(e.key === "Enter") window.cambiarSala(inp.value); };
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", letrero); else letrero();
+})();
+</script>
 </head>
 <body>
 <header id="top">
@@ -183,6 +221,7 @@ pre.proto{max-height:none}
 
 <main>
   <!-- ===================== CARRO ===================== -->
+  <div id="permAviso" hidden role="alertdialog" aria-live="assertive"><span>🚚 <b id="permAvisoTxt"></b></span><button class="btn green" type="button" id="permSi">Aprobar</button><button class="btn red" type="button" id="permNo">Rechazar</button></div>
   <section id="vCarro">
     <div class="titulo">
       <h2>Carro AGV · entrega a almacenes</h2>
@@ -218,6 +257,11 @@ pre.proto{max-height:none}
         <p class="nota notaCtl" id="notaCtl"></p>
         <div class="fld velFld"><label for="vel">Velocidad del carro <b id="velTxt">60 %</b></label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
         <p class="nota" id="destNota">QR-HOME = estación de carga · QR-E1, E2 y E3 = almacenes. El carro se detiene en cada QR y solo descarga en el almacén elegido.</p>
+      </section>
+      <section class="grp permCard" id="permCard">
+        <div class="cardHead"><h3>Carro físico en esta sala</h3><span class="pill" id="permPill">—</span></div>
+        <div id="permLista"><p class="nota">Ningún carro físico está pidiendo entrar.</p></div>
+        <p class="nota" id="permNota">Si un carro ESP32 quiere entrar a tu sala, aquí te pide permiso. Si no lo apruebas, no entra.</p>
       </section>
       </div>
     </div>
@@ -690,7 +734,7 @@ function conectarServidor(){
   if(!url){ render(); return; }
   try{ SRV.ws = new WebSocket(url); }catch(_){ SRV.reintento = setTimeout(conectarServidor, 4000); return; }
   const ws = SRV.ws;
-  ws.onopen = () => ws.send(JSON.stringify(MODO_SIM ? { tipo:"hola", rol:"agv", pagina:true } : { tipo:"hola", rol:"agv_vista" }));
+  ws.onopen = () => ws.send(JSON.stringify(MODO_SIM ? { tipo:"hola", rol:"agv", pagina:true, sala: window.SALA } : { tipo:"hola", rol:"agv_vista", sala: window.SALA }));
   ws.onmessage = (e) => {
     let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
     if(m.tipo === "hola_ok"){
@@ -707,6 +751,7 @@ function conectarServidor(){
     else if(m.tipo === "hmi"){ SRV.hmi = !!m.en_linea; log(SRV.hmi ? "🌐 El HMI está en línea." : "⚠ El HMI se desconectó."); if(SRV.hmi) publicar(true); }
     else if(MODO_SIM && m.tipo === "agv_cmd") deHmi(m);
     else if(m.tipo === "error"){ toast("Servidor: " + m.msg); log("⚠ Servidor: " + m.msg); }
+    else if(m.tipo === "carros_sala"){ deCarrosSala(m); }
     render();
   };
   ws.onclose = () => {
@@ -714,6 +759,42 @@ function conectarServidor(){
     SRV.abierto = false; SRV.hmi = false; render();
     SRV.reintento = setTimeout(conectarServidor, 3000);
   };
+}
+
+/* ===== Permiso del carro físico (ESP32) para entrar a esta sala ===== */
+const PERM = { pendientes:[], conectado:null, pide:true, visto:new Set() };
+function permEsc(t){ return String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function permResponder(id, ok){ mandar({ tipo:"permiso_carro", id, ok }); log(ok ? "✔ Le diste permiso al carro físico para entrar a la sala." : "✖ Rechazaste al carro físico."); }
+function permSacar(id){ mandar({ tipo:"permiso_carro", id, quitar:true }); log("⏏ Sacaste al carro físico de la sala."); }
+function pintarPermiso(){
+  const lista = $("#permLista"), pill = $("#permPill");
+  let h = "";
+  if(PERM.conectado) h += `<div class="permItem"><b>✔ ${permEsc(PERM.conectado.nombre)}<small>Conectado a la sala · ${permEsc(PERM.conectado.id)}</small></b>${PERM.pide ? `<button class="btn red" type="button" data-sacar="${permEsc(PERM.conectado.id)}">Sacar</button>` : ""}</div>`;
+  PERM.pendientes.forEach(p => { h += `<div class="permItem"><b>⏳ ${permEsc(p.nombre)}<small>Pide entrar · ${permEsc(p.id)}</small></b><button class="btn green" type="button" data-si="${permEsc(p.id)}">Aprobar</button><button class="btn red" type="button" data-no="${permEsc(p.id)}">Rechazar</button></div>`; });
+  if(!h) h = '<p class="nota">Ningún carro físico está pidiendo entrar.</p>';
+  lista.innerHTML = h;
+  lista.querySelectorAll("[data-si]").forEach(b => b.onclick = () => permResponder(b.dataset.si, true));
+  lista.querySelectorAll("[data-no]").forEach(b => b.onclick = () => permResponder(b.dataset.no, false));
+  lista.querySelectorAll("[data-sacar]").forEach(b => b.onclick = () => permSacar(b.dataset.sacar));
+  pill.textContent = PERM.conectado ? "CONECTADO" : PERM.pendientes.length ? "PIDE PERMISO" : "NINGUNO";
+  pill.className = "pill" + (PERM.conectado ? " ok" : "");
+  // aviso grande arriba para la primera solicitud nueva
+  const nuevo = PERM.pendientes.find(p => !PERM.visto.has(p.id));
+  const av = $("#permAviso");
+  if(nuevo){
+    $("#permAvisoTxt").textContent = `"${nuevo.nombre}" quiere entrar a tu sala "${window.SALA}". ¿Le das permiso?`;
+    $("#permSi").onclick = () => { PERM.visto.add(nuevo.id); permResponder(nuevo.id, true); av.hidden = true; };
+    $("#permNo").onclick = () => { PERM.visto.add(nuevo.id); permResponder(nuevo.id, false); av.hidden = true; };
+    av.hidden = false;
+  } else av.hidden = true;
+}
+function deCarrosSala(m){
+  const antes = new Set(PERM.pendientes.map(p => p.id));
+  PERM.pendientes = Array.isArray(m.pendientes) ? m.pendientes : [];
+  PERM.conectado = m.conectado || null; PERM.pide = m.pide_permiso !== false;
+  PERM.visto.forEach(id => { if(!PERM.pendientes.some(p => p.id === id)) PERM.visto.delete(id); });
+  PERM.pendientes.forEach(p => { if(!antes.has(p.id)) { log(`🚚 El carro físico "${p.nombre}" pide entrar a la sala.`); toast("Un carro físico pide permiso para entrar a tu sala."); } });
+  pintarPermiso();
 }
 function deHmi(m){
   switch(m.cmd){

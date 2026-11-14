@@ -660,7 +660,7 @@ function renderMant(m){
   $$("#cardModo .modoBtn").forEach(b => b.classList.toggle("on", (b.dataset.sim === "1") === sim));
   $("#redPill").textContent = m.srv ? "SERVIDOR CONECTADO" : "SIN SERVIDOR";
   $("#redPill").classList.toggle("ok", !!m.srv);
-  $("#redTxt").textContent = `Wi-Fi "${m.ssid || "—"}": ${m.sta ? "conectado · IP del carro " + m.ip : "sin conexión"} · Servidor ${m.srvHost ? m.srvHost + ":" + m.srvPort + (m.srvAuto ? " (encontrado solo)" : "") : "buscando…"}: ${m.srv ? "conectado" : "sin conexión"} · HMI: ${m.hmi ? "en línea" : "sin conexión"}`;
+  $("#redTxt").textContent = `Wi-Fi "${m.ssid || "—"}": ${m.sta ? "conectado · IP del carro " + m.ip : "sin conexión"} · Servidor ${m.srvHost ? m.srvHost + ":" + m.srvPort + (m.srvAuto ? " (encontrado solo)" : "") : "buscando…"}: ${m.srv ? "conectado" : "sin conexión"} · Sala "${m.sala || "principal"}": ${({esperando:"esperando permiso (apruébalo en la página del carro de esa sala)",aprobado:"dentro de la sala",rechazado:"rechazado",fuera:"fuera de la sala"})[m.permiso] || "—"} · HMI: ${m.hmi ? "en línea" : "sin conexión"}`;
 
   if(!camposListos){
     camposListos = true;

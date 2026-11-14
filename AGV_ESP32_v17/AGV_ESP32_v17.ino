@@ -239,6 +239,12 @@ const uint16_t PUERTO_BUSQUEDA = 3333;   // aviso del servidor por la red (no lo
 // Servidor en la NUBE (link fijo). Si lo escribes aquí, el carro se conecta siempre a él.
 // ej. "celda-llenado.onrender.com"  (sin https:// y sin / al final). Vacío = usa la laptop de la red.
 const char* SERVIDOR_NUBE = "celda-llenado.onrender.com";
+// SALA a la que entra el carro (la misma que va en el link: ...AGV_Carro_v17.html?sala=nombre).
+// Minúsculas, sin espacios ni acentos. Vacío = sala "principal".
+// En la nube el carro PIDE PERMISO: lo apruebas en la página del carro de esa sala.
+const char* SALA         = "";      // ej. "equipo2"
+const char* NOMBRE_CARRO = "Carro ESP32";   // así aparece en la solicitud de permiso
+String permisoCarro = "";            // "", "esperando", "aprobado", "rechazado", "fuera"
 
 // ======================================================================
 // PINES - ESP32-S3 + QTR-8A ANALOGICO
@@ -1743,6 +1749,14 @@ void procesarServidor(uint8_t* payload, size_t length) {
     hmiEnLinea = doc["en_linea"] | false;
   } else if (strcmp(tipo, "error") == 0) {
     Serial.printf("Servidor: %s\n", (const char*)(doc["msg"] | ""));
+  } else if (strcmp(tipo, "agv_permiso") == 0) {        // permiso para entrar a la sala
+    permisoCarro = (const char*)(doc["estado"] | "");
+    const char* sl = doc["sala"] | "";
+    if (permisoCarro == "esperando")      Serial.printf("Servidor: esperando permiso para entrar a la sala '%s'. Apruebalo en la pagina del carro de esa sala.\n", sl);
+    else if (permisoCarro == "aprobado")  Serial.printf("Servidor: permiso aprobado, el carro ya esta en la sala '%s'.\n", sl);
+    else if (permisoCarro == "rechazado") Serial.printf("Servidor: la sala '%s' rechazo al carro.\n", sl);
+    else if (permisoCarro == "fuera")     Serial.printf("Servidor: el carro salio de la sala '%s'.\n", sl);
+    enviarTelemetria();
   } else if (strcmp(tipo, "agv_ctl") == 0) {             // desde la página AGV_Carro (modo Carro ESP32)
     const char* c = doc["cmd"] | "";
     if (strcmp(c, "paro") == 0)          carroParo(doc["on"] | false);
@@ -1770,9 +1784,16 @@ void onServidorEvento(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED: {
       srvOk = true;
-      StaticJsonDocument<96> h;
+      StaticJsonDocument<256> h;
       h["tipo"] = "hola";
       h["rol"] = "agv";
+      h["sala"] = SALA;
+      h["nombre"] = NOMBRE_CARRO;
+      {
+        String mac = WiFi.macAddress(); mac.replace(":", "");
+        h["id"] = String("esp-") + mac;
+      }
+      permisoCarro = "";
       String s;
       serializeJson(h, s);
       wsServidor.sendTXT(s);
@@ -1780,7 +1801,7 @@ void onServidorEvento(WStype_t type, uint8_t* payload, size_t length) {
       break;
     }
     case WStype_DISCONNECTED:
-      srvOk = false; hmiEnLinea = false;
+      srvOk = false; hmiEnLinea = false; permisoCarro = "";
       Serial.println(F("Servidor: desconectado, reintentando..."));
       break;
     case WStype_TEXT:
@@ -1873,6 +1894,8 @@ void enviarTelemetria() {
   doc["ip"]      = WiFi.localIP().toString();
   doc["ssid"]    = redSsid;
   doc["srvHost"] = srvHost;
+  doc["permiso"] = permisoCarro;
+  doc["sala"]    = (strlen(SALA) ? SALA : "principal");
   doc["srvPort"] = srvPort;
   doc["srvAuto"] = srvAuto;
 
