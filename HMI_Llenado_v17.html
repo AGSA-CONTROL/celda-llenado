@@ -3031,8 +3031,10 @@ const AGV = (() => {
   function avisarDisponibilidad(forzar){
     avisarRueda(forzar);
     if(!window.DISP) return;
-    const ok = !st.usar || enCarga();
-    const msg = ok ? "" : !st.online ? "El carro de entrega no está disponible en este momento."
+    const dispOk = !DISP.listo || DISP.listo();
+    const ok = dispOk && (!st.usar || enCarga());
+    const msg = ok ? "" : !dispOk ? "El dispensador no está listo en este momento (se está conectando o está en paro). Intenta en un momento."
+      : !st.online ? "El carro de entrega no está disponible en este momento."
       : st.estado === "REGRESANDO" ? "El carro regresa a la posición de carga. En cuanto llegue podrás hacer tu pedido."
       : "El carro está entregando un pedido. Podrás hacer tu pedido cuando regrese a la posición de carga.";
     const o = { tipo:"disponibilidad", pedir:ok, agv:st.usar ? st.estado : "", msg };
@@ -3041,6 +3043,7 @@ const AGV = (() => {
     ultDisp = k; DISP.servidor(o);
   }
 
+  setInterval(() => avisarDisponibilidad(), 1000);   // si el dispensador se conecta o entra en paro, la tienda se entera
   /* ---------- API para el resto del HMI ---------- */
   const api = {
     avisar: (f) => avisarDisponibilidad(f),
@@ -4249,6 +4252,7 @@ $("btnFinLote").addEventListener("click", () => {
 });
 render();
 return {
+  listo: () => !!(link && st.listo && !st.emergencia),   // ¿el dispensador puede recibir pedidos?
   pump: () => pumpCola(),
   caida: (g) => caida(g),
   tapaFin: () => tapaFin(),
