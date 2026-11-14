@@ -64,19 +64,23 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .nota{font-size:13px;color:var(--muted);line-height:1.45;margin:0}
 
 /* vista del carro */
-.titulo{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.titulo{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px}
 .titulo .sub{margin:0}
-.tablero{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
-.ficha{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.tablero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tablero .fEstado,.tablero .fVasos{grid-column:1/-1}
+.fVasos .vasos{min-height:44px}
+.dest svg{display:none!important}
+.lado{display:flex;flex-direction:column;gap:12px;min-width:0}
+.ficha{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .flbl{font-size:11px;letter-spacing:1.4px;color:var(--muted);font-weight:700;text-transform:uppercase}
 .dest{display:flex;gap:12px;align-items:center;min-height:52px}
 .dest svg{width:52px;height:52px;flex:none;background:#fff;border-radius:5px;padding:3px}
 .dest b{display:block;font-size:17px;color:var(--yellow);line-height:1.2}
 .dest small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.3}
-.carroGrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:stretch}
-.mapa{padding:10px;display:flex;align-items:center;justify-content:center}
-#svg{width:100%;height:auto;display:block;max-height:calc(100vh - 335px);min-height:300px}
-.ctl{display:flex;flex-direction:column;gap:10px}
+.carroGrid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+.mapa{padding:4px;display:flex;align-items:center;justify-content:center;position:sticky;top:0}
+#svg{width:100%;height:auto;display:block;max-height:calc(100vh - 150px);min-height:320px}
+.ctl{display:flex;flex-direction:column;gap:9px;padding:14px}
 .ctl h3{margin-bottom:2px}
 .paso{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-top:4px}
 .pnum{width:22px;height:22px;border-radius:50%;background:var(--yellow);color:#1b1204;font-size:13px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none}
@@ -146,7 +150,7 @@ pre.proto{max-height:none}
 #pie{background:var(--panel);border-top:1px solid var(--border);font-family:var(--mono);font-size:13px;color:var(--muted);padding:8px 18px}
 #toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border2);padding:12px 18px;border-radius:10px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw}
 #toast.on{opacity:1}
-@media (max-width:1100px){.carroGrid,.abajo{grid-template-columns:1fr}.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.connRow{grid-template-columns:1fr}#svg{max-height:none}}
+@media (max-width:1100px){.carroGrid,.abajo{grid-template-columns:1fr}.mapa{position:static}.connRow{grid-template-columns:1fr}#svg{max-height:none}}
 @media (max-width:640px){.tablero{grid-template-columns:1fr}#top{gap:8px}}
 @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
 .pasos{margin:0;padding-left:20px;line-height:1.55;font-size:14px}
@@ -185,22 +189,21 @@ pre.proto{max-height:none}
       <p class="sub">El carro espera en la estación de carga, recibe los vasos aprobados y los lleva al almacén que elijas.</p>
     </div>
 
-    <!-- 1) Cómo está el carro: 4 datos en una fila -->
+    <!-- 2) Mapa y controles -->
+    <div class="carroGrid">
+      <section class="grp mapa"><svg id="svg" viewBox="28 0 972 588" role="img" aria-label="Circuito del carro con la estación de carga, los códigos QR y los tres almacenes"></svg></section>
+      <div class="lado">
     <div class="tablero">
       <div class="ficha fEstado"><span class="flbl">Estado del carro</span>
         <div class="estado" id="estado"><b>—</b><small></small></div></div>
       <div class="ficha"><span class="flbl">Destino del lote</span>
         <div class="dest"><svg id="qr" viewBox="0 0 25 25" aria-label="Código QR del almacén de destino"></svg>
           <div><b id="destTxt">—</b><small id="destSub"></small></div></div></div>
-      <div class="ficha"><span class="flbl">Vasos en el carro</span>
-        <div class="vasos" id="vasos"><span></span><span></span><span></span></div></div>
       <div class="ficha"><span class="flbl">Último QR leído</span>
         <div class="lugar" id="lugar">—</div></div>
+      <div class="ficha fVasos"><span class="flbl">Vasos en el carro</span>
+        <div class="vasos" id="vasos"><span></span><span></span><span></span></div></div>
     </div>
-
-    <!-- 2) Mapa y controles -->
-    <div class="carroGrid">
-      <section class="grp mapa"><svg id="svg" viewBox="0 0 1000 600" role="img" aria-label="Circuito del carro con la estación de carga, los códigos QR y los tres almacenes"></svg></section>
       <section class="grp ctl">
         <h3>Control</h3>
         <div class="paso"><span class="pnum">1</span>Elige el almacén</div>
@@ -216,6 +219,7 @@ pre.proto{max-height:none}
         <div class="fld velFld"><label for="vel">Velocidad del carro <b id="velTxt">60 %</b></label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
         <p class="nota" id="destNota">QR-HOME = estación de carga · QR-E1, E2 y E3 = almacenes. El carro se detiene en cada QR y solo descarga en el almacén elegido.</p>
       </section>
+      </div>
     </div>
 
     <!-- 3) Historial -->
