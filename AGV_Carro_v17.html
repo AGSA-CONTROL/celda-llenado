@@ -41,10 +41,8 @@ button,input,select{font:inherit;color:inherit}
 .btnAvanzar{flex:1;padding:16px 10px;border-radius:12px;border:0;background:var(--green);color:#06210f;font-weight:900;font-size:17px;cursor:pointer}
 .btnAvanzar:disabled{background:var(--inset);color:var(--muted);cursor:not-allowed}
 .btnParo2{flex:1;padding:16px 10px;font-size:17px}
-.lugar{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--inset);font-size:14px}
-.lugar b{color:var(--yellow)}
-.qrLeyenda{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;margin-top:8px;font-size:12.5px;color:var(--muted)}
-.qrLeyenda b{color:var(--text,#e6e9ef)}
+.lugar{font-size:17px;font-weight:800;color:var(--yellow);line-height:1.25}
+.lugar small{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-top:3px}
 .notaCtl.mal{color:var(--red);font-weight:700}
 
 main{flex:1;min-height:0;overflow:auto;padding:16px 18px}
@@ -66,38 +64,51 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .nota{font-size:13px;color:var(--muted);line-height:1.45;margin:0}
 
 /* vista del carro */
-.carroGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,380px);gap:16px;align-items:start}
-.mapa{padding:12px}
-#svg{width:100%;height:auto;display:block;max-height:calc(100vh - 190px)}
-.lado{display:flex;flex-direction:column;gap:12px}
-.estado{font-size:20px;font-weight:800;padding:14px 16px;border-radius:10px;background:var(--inset);border:1px solid var(--border);border-left:5px solid var(--dim);line-height:1.2}
-.estado small{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-top:4px}
+.titulo{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.titulo .sub{margin:0}
+.tablero{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.ficha{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.flbl{font-size:11px;letter-spacing:1.4px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.dest{display:flex;gap:12px;align-items:center;min-height:52px}
+.dest svg{width:52px;height:52px;flex:none;background:#fff;border-radius:5px;padding:3px}
+.dest b{display:block;font-size:17px;color:var(--yellow);line-height:1.2}
+.dest small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.3}
+.carroGrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:stretch}
+.mapa{padding:10px;display:flex;align-items:center;justify-content:center}
+#svg{width:100%;height:auto;display:block;max-height:calc(100vh - 335px);min-height:300px}
+.ctl{display:flex;flex-direction:column;gap:10px}
+.ctl h3{margin-bottom:2px}
+.paso{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-top:4px}
+.pnum{width:22px;height:22px;border-radius:50%;background:var(--yellow);color:#1b1204;font-size:13px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.velFld{margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}
+.velFld label{display:flex;justify-content:space-between}
+.velFld label b{color:var(--text);letter-spacing:0}
+.abajo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:16px;margin-top:16px;align-items:start}
+.estado{font-size:18px;font-weight:800;padding:8px 12px;border-radius:8px;background:var(--inset);border:1px solid var(--border);border-left:5px solid var(--dim);line-height:1.2}
+.estado small{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-top:3px}
 .estado.carga{border-left-color:var(--green)} .estado.carga b{color:var(--green)}
 .estado.ruta{border-left-color:var(--yellow)} .estado.ruta b{color:var(--yellow)}
 .estado.paro{border-left-color:var(--red)} .estado.paro b{color:var(--red)}
-.tag{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px}
-.vasos{display:flex;gap:10px;align-items:flex-end;margin-top:6px}
+.vasos{display:flex;gap:10px;align-items:flex-end;min-height:52px}
 .vasos span{width:34px;height:44px;clip-path:polygon(8% 0,92% 0,80% 100%,20% 100%);background:var(--inset);box-shadow:inset 0 0 0 2px var(--border2)}
 .vasos span.lleno{background:var(--c)}
-.qr{display:flex;gap:14px;align-items:center}
-.qr svg{width:104px;height:104px;flex:none;background:#fff;border-radius:6px;padding:6px}
-.qr b{display:block;font-size:22px;color:var(--yellow)}
-.qr small{display:block;color:var(--muted);font-size:13px}
 .cuenta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
 .cuenta div{background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:8px 4px}
 .cuenta b{display:block;font-size:22px;font-family:var(--mono)}
 .cuenta small{color:var(--muted);font-size:11px}
 .cuenta .piso b{color:var(--red)}
-.ctl{display:grid;gap:12px}
-#registro{list-style:none;margin:0;padding:0;max-height:220px;overflow:auto;font-size:13px}
+#registro{list-style:none;margin:0;padding:0;max-height:180px;overflow:auto;font-size:13px}
 #registro li{padding:5px 0;border-bottom:1px solid #1d242f;color:var(--muted)}
 #registro li b{font-family:var(--mono);color:var(--dim);font-weight:500;margin-right:8px}
 #svg .alm rect.edif{fill:#1d2530;stroke:#3b4659;stroke-width:2}
 #svg .alm.dest rect.edif{stroke:var(--yellow);stroke-width:3}
 #svg .alm.bajando rect.edif{fill:#2a2412;stroke-width:4}
 #svg .alm.dest .tit{fill:var(--yellow)}
-#svg .alm .tit{fill:var(--text);font:700 16px var(--sans)}
+#svg .alm .tit{fill:var(--text);font:700 17px var(--sans)}
 #svg .alm .num{fill:var(--muted);font:600 12px var(--mono)}
+#svg .alm .eti{fill:#11161d;stroke:#2c3544;stroke-width:1.5}
+#svg .alm.dest .eti,#svg .alm.prox .eti{stroke:var(--yellow)}
+#svg .rotulo{fill:#98a3b3;font:600 13px var(--sans)}
 /* v17: almacén elegido, QR de cada estación */
 #svg .alm.prox rect.edif{stroke:var(--yellow);stroke-width:2.5;stroke-dasharray:8 6}
 #svg .alm.prox .tit{fill:var(--yellow)}
@@ -108,7 +119,7 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .destBtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .destBtns.pide button{animation:pide 1s ease-in-out infinite}
 @keyframes pide{50%{border-color:var(--yellow);box-shadow:0 0 14px rgba(245,166,35,.55)}}
-.destBtns button{padding:12px 4px;border-radius:10px;border:2px solid var(--border2);background:var(--inset);font-weight:800;font-size:15px;cursor:pointer;line-height:1.15}
+.destBtns button{padding:14px 4px;border-radius:10px;border:2px solid var(--border2);background:var(--inset);font-weight:800;font-size:15px;cursor:pointer;line-height:1.15}
 .destBtns button small{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:3px}
 .destBtns button.on{border-color:var(--yellow);background:rgba(245,166,35,.14);color:var(--yellow)}
 #svg .parada line{stroke:#c9d1db;stroke-width:3}
@@ -135,7 +146,8 @@ pre.proto{max-height:none}
 #pie{background:var(--panel);border-top:1px solid var(--border);font-family:var(--mono);font-size:13px;color:var(--muted);padding:8px 18px}
 #toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border2);padding:12px 18px;border-radius:10px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw}
 #toast.on{opacity:1}
-@media (max-width:1100px){.carroGrid{grid-template-columns:1fr}.connRow{grid-template-columns:1fr}}
+@media (max-width:1100px){.carroGrid,.abajo{grid-template-columns:1fr}.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.connRow{grid-template-columns:1fr}#svg{max-height:none}}
+@media (max-width:640px){.tablero{grid-template-columns:1fr}#top{gap:8px}}
 @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
 .pasos{margin:0;padding-left:20px;line-height:1.55;font-size:14px}
 .pasos li{margin-bottom:4px}
@@ -168,47 +180,54 @@ pre.proto{max-height:none}
 <main>
   <!-- ===================== CARRO ===================== -->
   <section id="vCarro">
-    <h2>Carro AGV · entrega a almacenes</h2>
-    <p class="sub">Seguidor de línea. Espera en la posición de carga mientras la rueda arma el lote; los vasos aprobados caen al carro. Con el lote completo sale y se detiene en cada estación a leer su QR; descarga en el almacén que elegiste y regresa por la línea a la posición de carga.</p>
+    <div class="titulo">
+      <h2>Carro AGV · entrega a almacenes</h2>
+      <p class="sub">El carro espera en la estación de carga, recibe los vasos aprobados y los lleva al almacén que elijas.</p>
+    </div>
+
+    <!-- 1) Cómo está el carro: 4 datos en una fila -->
+    <div class="tablero">
+      <div class="ficha fEstado"><span class="flbl">Estado del carro</span>
+        <div class="estado" id="estado"><b>—</b><small></small></div></div>
+      <div class="ficha"><span class="flbl">Destino del lote</span>
+        <div class="dest"><svg id="qr" viewBox="0 0 25 25" aria-label="Código QR del almacén de destino"></svg>
+          <div><b id="destTxt">—</b><small id="destSub"></small></div></div></div>
+      <div class="ficha"><span class="flbl">Vasos en el carro</span>
+        <div class="vasos" id="vasos"><span></span><span></span><span></span></div></div>
+      <div class="ficha"><span class="flbl">Último QR leído</span>
+        <div class="lugar" id="lugar">—</div></div>
+    </div>
+
+    <!-- 2) Mapa y controles -->
     <div class="carroGrid">
-      <section class="grp mapa"><svg id="svg" viewBox="0 0 1000 600" role="img" aria-label="Circuito del carro con la posición de carga, el lector QR y los tres almacenes"></svg></section>
-      <div class="lado">
-        <section class="grp">
-          <h3>Estado del carro</h3>
-          <div class="estado" id="estado"><b>—</b><small></small></div>
-          <div class="lugar" id="lugar">Último QR leído: <b>—</b></div>
-          <div class="tag">Vasos en el carro</div>
-          <div class="vasos" id="vasos"><span></span><span></span><span></span></div>
-        </section>
-        <section class="grp">
-          <h3>Destino del lote</h3>
-          <div class="qr"><svg id="qr" viewBox="0 0 25 25" aria-label="Código QR del lote"></svg>
-            <div><b id="destTxt">—</b><small id="destSub">El destino se lee en el QR al salir de carga.</small></div></div>
-        </section>
-        <section class="grp ctl">
-          <h3>Control</h3>
-          <div class="fld"><label>¿A qué almacén va el lote?</label>
-            <div class="destBtns" id="destBtns">
-              <button type="button" data-d="1">Almacén 1<small>QR-E1</small></button>
-              <button type="button" data-d="2">Almacén 2<small>QR-E2</small></button>
-              <button type="button" data-d="3">Almacén 3<small>QR-E3</small></button>
-            </div>
-            <select id="modoDest" hidden><option value="0">Sin elegir</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-            <div class="qrLeyenda"><span><b>QR-HOME</b> = estación de carga</span><span><b>QR-E1</b> = Almacén 1</span><span><b>QR-E2</b> = Almacén 2</span><span><b>QR-E3</b> = Almacén 3</span></div>
-            <p class="nota" id="destNota" style="margin-top:6px">El carro se detiene en cada estación y lee su QR; descarga solo al leer el QR del almacén elegido.</p></div>
-          <div class="fld"><label for="vel">Velocidad del carro</label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
-          <div class="row"><button class="btnAvanzar" id="btnEnviar" type="button">▶ AVANZAR</button><button class="paro btnParo2" id="btnParo2" type="button">⛔ PARO</button></div>
-          <p class="nota notaCtl" id="notaCtl"></p>
-        </section>
-        <section class="grp">
-          <h3>Entregas</h3>
-          <div class="cuenta"><div><b id="c1">0</b><small>Almacén 1</small></div><div><b id="c2">0</b><small>Almacén 2</small></div><div><b id="c3">0</b><small>Almacén 3</small></div><div class="piso"><b id="cPiso">0</b><small>Vasos al piso</small></div></div>
-        </section>
-        <section class="grp">
-          <h3>Registro</h3>
-          <ul id="registro"></ul>
-        </section>
-      </div>
+      <section class="grp mapa"><svg id="svg" viewBox="0 0 1000 600" role="img" aria-label="Circuito del carro con la estación de carga, los códigos QR y los tres almacenes"></svg></section>
+      <section class="grp ctl">
+        <h3>Control</h3>
+        <div class="paso"><span class="pnum">1</span>Elige el almacén</div>
+        <div class="destBtns" id="destBtns">
+          <button type="button" data-d="1">Almacén 1<small>QR-E1</small></button>
+          <button type="button" data-d="2">Almacén 2<small>QR-E2</small></button>
+          <button type="button" data-d="3">Almacén 3<small>QR-E3</small></button>
+        </div>
+        <select id="modoDest" hidden><option value="0">Sin elegir</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+        <div class="paso"><span class="pnum">2</span>Mueve el carro</div>
+        <div class="row"><button class="btnAvanzar" id="btnEnviar" type="button">▶ AVANZAR</button><button class="paro btnParo2" id="btnParo2" type="button">⛔ PARO</button></div>
+        <p class="nota notaCtl" id="notaCtl"></p>
+        <div class="fld velFld"><label for="vel">Velocidad del carro <b id="velTxt">60 %</b></label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
+        <p class="nota" id="destNota">QR-HOME = estación de carga · QR-E1, E2 y E3 = almacenes. El carro se detiene en cada QR y solo descarga en el almacén elegido.</p>
+      </section>
+    </div>
+
+    <!-- 3) Historial -->
+    <div class="abajo">
+      <section class="grp">
+        <h3>Entregas</h3>
+        <div class="cuenta"><div><b id="c1">0</b><small>Almacén 1</small></div><div><b id="c2">0</b><small>Almacén 2</small></div><div><b id="c3">0</b><small>Almacén 3</small></div><div class="piso"><b id="cPiso">0</b><small>Vasos al piso</small></div></div>
+      </section>
+      <section class="grp">
+        <h3>Registro</h3>
+        <ul id="registro"></ul>
+      </section>
     </div>
   </section>
 
@@ -349,7 +368,7 @@ function qrSvg(texto){
 function qrEst(n, x, y, tx, ty){
   return `<g class="qrE" id="qrE${n}"><rect class="fondo" x="${x}" y="${y}" width="44" height="44" rx="3"/>
     <svg x="${x+3}" y="${y+3}" width="38" height="38" viewBox="0 0 25 25">${qrSvg("QR-" + n)}</svg>
-    <text x="${tx}" y="${ty}" text-anchor="middle">QR-${n}</text></g>`;
+    <text x="${tx}" y="${ty}" text-anchor="${n === "E2" ? "end" : "middle"}">QR-${n}</text></g>`;
 }
 let ultQr = null;
 function qrLeido(n){
@@ -364,6 +383,7 @@ function dibujar(){
       ${[0,1,2].map(k => { const ex = x+12+k*((w-24)/3), ew = (w-24)/3-8; ALM_GEO[n][k] = { x:ex, y:y+26, w:ew, h:h-36 };
         return `<rect x="${ex}" y="${y+26}" width="${ew}" height="${h-36}" rx="3" fill="#141920" stroke="#2c3544"/>`; }).join("")}
       <g id="almV${n}"></g>
+      <rect class="eti" x="${tx-78}" y="${ty-20}" width="156" height="46" rx="8"/>
       <text class="tit" x="${tx}" y="${ty}" text-anchor="middle">Almacén ${n}</text>
       <text class="num" x="${tx}" y="${ty+17}" text-anchor="middle" id="almN${n}">0 lotes</text></g>`;
   for(let n = 1; n <= 3; n++) ALM_GEO[n] = [];
@@ -377,23 +397,22 @@ function dibujar(){
     </g>
     <path d="M150 300 L258 322" stroke="#f5a623" stroke-width="4" stroke-dasharray="8 7" fill="none"/>
     <path d="M258 322 l-12 -9 m12 9 l-14 4" stroke="#f5a623" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <text x="150" y="350" text-anchor="middle" fill="#98a3b3" font-size="13" font-family="system-ui,sans-serif">Caída libre de</text>
-    <text x="150" y="366" text-anchor="middle" fill="#98a3b3" font-size="13" font-family="system-ui,sans-serif">vasos aprobados</text>
+    <text class="rotulo" x="110" y="338" text-anchor="middle">Caída libre de</text>
+    <text class="rotulo" x="110" y="354" text-anchor="middle">vasos aprobados</text>
     <path id="ruta" d="${RUTA}" fill="none" stroke="#05070a" stroke-width="16" stroke-linejoin="round"/>
     <path d="${RUTA}" fill="none" stroke="#2a313c" stroke-width="1.5" stroke-dasharray="10 12"/>
-    <text x="565" y="300" text-anchor="middle" fill="#5f6b7c" font-size="14" font-family="system-ui,sans-serif">Línea guía · el carro la sigue con 3 sensores infrarrojos</text>
     <g class="parada"><line x1="258" y1="330" x2="302" y2="330"/><text x="312" y="335" fill="#33c469" font-size="15" font-weight="700" font-family="system-ui,sans-serif">CARGA</text></g>
     <svg id="qrPiso" width="0" height="0"></svg>
     ${qrEst("HOME", 204, 284, 226, 342)}
     ${qrEst("E1", 628, 398, 650, 392)}
-    ${qrEst("E2", 778, 268, 800, 326)}
+    ${qrEst("E2", 778, 268, 750, 294)}
     ${qrEst("E3", 538, 140, 560, 198)}
     <g class="parada"><line x1="650" y1="448" x2="650" y2="492"/></g>
     <g class="parada"><line x1="828" y1="290" x2="872" y2="290"/></g>
     <g class="parada"><line x1="560" y1="88" x2="560" y2="132"/></g>
-    ${alm(1, 590, 500, 120, 70, 790, 530)}
-    ${alm(2, 885, 225, 105, 130, 937, 375)}
-    ${alm(3, 500, 8, 120, 62, 690, 36)}
+    ${alm(1, 590, 500, 120, 70, 800, 531)}
+    ${alm(2, 885, 225, 105, 130, 920, 390)}
+    ${alm(3, 500, 8, 120, 62, 710, 37)}
     <g id="vuelos"></g>
     <g id="carro">
       <rect x="-30" y="-22" width="60" height="44" rx="9" fill="#2b3442" stroke="#c9d1db" stroke-width="2"/>
@@ -654,7 +673,7 @@ const visible = sel => !$(sel).hidden;
 /* =====================================================================
    SERVIDOR (comunicación con el HMI)
    ===================================================================== */
-const SRV = { ws:null, abierto:false, hmi:false, reintento:null };
+const SRV = { ws:null, abierto:false, hmi:false, reintento:null, espera:false };
 function urlServidor(){
   if(location.protocol.startsWith("http")) return (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
   const a = (cfg.srv || "").trim().replace(/^wss?:\/\//, "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
@@ -667,10 +686,17 @@ function conectarServidor(){
   if(!url){ render(); return; }
   try{ SRV.ws = new WebSocket(url); }catch(_){ SRV.reintento = setTimeout(conectarServidor, 4000); return; }
   const ws = SRV.ws;
-  ws.onopen = () => ws.send(JSON.stringify({ tipo:"hola", rol:MODO_SIM ? "agv" : "agv_vista" }));
+  ws.onopen = () => ws.send(JSON.stringify(MODO_SIM ? { tipo:"hola", rol:"agv", pagina:true } : { tipo:"hola", rol:"agv_vista" }));
   ws.onmessage = (e) => {
     let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
-    if(m.tipo === "hola_ok"){ SRV.abierto = true; SRV.hmi = !!m.hmi; if(!MODO_SIM) ESP.online = !!m.agv; log("🌐 Conectado al servidor."); publicar(true); }
+    if(m.tipo === "hola_ok"){
+      const antes = SRV.espera; SRV.abierto = true; SRV.hmi = !!m.hmi; if(!MODO_SIM) ESP.online = !!m.agv;
+      SRV.espera = MODO_SIM && m.activo === false;
+      if(SRV.espera) log("⏸ Conectado, pero en espera: otra página del carro en modo Simulador está activa.");
+      else log(antes ? "🌐 Esta página vuelve a ser el carro activo." : "🌐 Conectado al servidor.");
+      publicar(true);
+    }
+    else if(m.tipo === "agv_espera"){ SRV.espera = true; toast("Otra página del carro tomó el control. Esta queda en espera."); log("⏸ En espera: otra página del carro en modo Simulador está activa."); }
     else if(!MODO_SIM && m.tipo === "agv"){ ESP.online = !!m.en_linea; if(!ESP.online) ESP.tel = null; log(ESP.online ? "🚚 El carro ESP32 se conectó." : "⚠ El carro ESP32 se desconectó."); }
     else if(!MODO_SIM && m.tipo === "agv_estado"){ delCarro(m); return; }
     else if(!MODO_SIM && m.tipo === "agv_evento"){ delCarroEvento(m); }
@@ -720,11 +746,11 @@ function render(){
   [...$("#vasos").children].forEach((sp, i) => { const g = st.vasos[i]; sp.classList.toggle("lleno", !!g); sp.style.setProperty("--c", g ? COLOR[g - 1] : "transparent"); });
   const leido = !!st.lote;
   const prox = proximoDestino();
-  $("#destTxt").textContent = st.lote ? `ALMACÉN ${st.lote.destino}` : prox ? `PRÓXIMO: ALMACÉN ${prox}` : "SIN ELEGIR";
-  $("#destSub").textContent = !st.lote ? (prox ? "El lote irá a ese almacén." : "Elige el almacén en Control. Sin almacén el carro no avanza.") : `Lote ${st.lote.n} · descarga al leer QR-E${st.lote.destino}`;
+  $("#destTxt").textContent = st.lote ? `Almacén ${st.lote.destino}` : prox ? `Almacén ${prox}` : "Sin elegir";
+  $("#destSub").textContent = st.lote ? `Lote ${st.lote.n} · descarga en QR-E${st.lote.destino}` : prox ? "Elegido para el próximo lote" : "Elígelo en Control (paso 1)";
   const dq = st.lote ? st.lote.destino : prox;
   $("#qr").innerHTML = dq ? qrSvg("QR-E" + dq) : "";
-  $("#qr").style.visibility = dq ? "" : "hidden";
+  $("#qr").style.display = dq ? "" : "none";
   for(let n = 1; n <= 3; n++){
     $("#alm" + n).classList.toggle("dest", !!(leido && st.lote.destino === n));
     $("#alm" + n).classList.toggle("prox", !st.lote && prox === n);
@@ -737,6 +763,7 @@ function render(){
   $$("#destBtns button").forEach(b => b.classList.toggle("on", b.dataset.d === valDest));
   let porque = "";
   if(!MODO_SIM && !SRV.abierto) porque = "No se puede: esta página no está conectada al servidor (abre la pestaña Comunicación).";
+  else if(MODO_SIM && SRV.espera) porque = "Esta página está en espera: hay otra página del carro en modo Simulador abierta. Usa esa o ciérrala.";
   else if(!MODO_SIM && !ESP.online) porque = "No se puede: el carro ESP32 no está conectado al servidor. Enciéndelo y espera a que diga EN LÍNEA.";
   else if(st.pausado) porque = "El carro está en PARO. Pulsa CONTINUAR para que siga.";
   else if(st.estado === "ESPERA_DESTINO") porque = "El lote está listo: elige el almacén (1, 2 o 3) y el carro sale solo.";
@@ -749,7 +776,9 @@ function render(){
     ? "Modo simulador: AVANZAR saca el carro virtual. PARO lo detiene donde esté."
     : "Listo: AVANZAR saca el carro hacia el almacén elegido. PARO lo detiene donde esté.");
   [$("#btnParo"), $("#btnParo2")].forEach(bp => { bp.textContent = st.pausado ? "▶ CONTINUAR" : "⛔ PARO"; bp.classList.toggle("cont", st.pausado); });
-  $("#lugar").innerHTML = "Último QR leído: <b>" + (ultQr === null ? (st.estado === "CARGA" ? "en carga" : "—") : ultQr === 0 ? "QR-HOME · estación de carga" : "QR-E" + ultQr + " · Almacén " + ultQr) + "</b>";
+  $("#lugar").innerHTML = ultQr === null ? (st.estado === "CARGA" ? "QR-HOME<small>Estación de carga</small>" : "—<small>Todavía no lee ningún QR</small>")
+    : ultQr === 0 ? "QR-HOME<small>Estación de carga</small>" : `QR-E${ultQr}<small>Almacén ${ultQr}</small>`;
+  $("#velTxt").textContent = $("#vel").value + " %";
   // chips
   $("#chipSrv").classList.toggle("ok", SRV.abierto);
   $("#chipHmi").classList.toggle("ok", SRV.hmi);
@@ -808,7 +837,7 @@ function render(){
     }
     render();
   });
-  $("#vel").addEventListener("input", e => { cfg.vel = Number(e.target.value); guardarCfg(); });
+  $("#vel").addEventListener("input", e => { cfg.vel = Number(e.target.value); guardarCfg(); $("#velTxt").textContent = e.target.value + " %"; });
   $("#vel").addEventListener("change", e => { if(!MODO_SIM) ctl("vel", { v:Number(e.target.value) }); });
   $("#btnEnviar").addEventListener("click", () => {
     if(!SRV.hmi || confirm("¿Enviar el carro ahora? Si la rueda está armando un lote, los vasos que falten caerán al piso.")) salir({ id:null, p:null });

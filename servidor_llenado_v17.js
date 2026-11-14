@@ -27,7 +27,20 @@ const server = http.createServer((req, res) => {
 
 /* ---------- mensajes ---------- */
 const wss = new WebSocketServer({ server, maxPayload: 16 * 1024 });
-let hmi = null, agv = null;
+let hmi = null, agv = null;     // agv = el carro ACTIVO (al que el HMI le habla)
+/* Puede haber varios "carros" conectados a la vez: el ESP32 real y páginas del carro en modo Simulador.
+   Manda la página en Simulador más nueva; si no hay ninguna, manda el ESP32. Los demás esperan su turno. */
+let agvEsp = null;              // el ESP32 real
+const agvPaginas = [];          // páginas del carro en modo Simulador (la última es la más nueva)
+function actualizarAgv() {
+  const nuevo = agvPaginas.length ? agvPaginas[agvPaginas.length - 1] : agvEsp;
+  if (nuevo === agv) return;
+  agv = nuevo;
+  if (agv) enviar(agv, { tipo: "hola_ok", hmi: !!hmi, activo: true });
+  [agvEsp, ...agvPaginas].forEach(c => { if (c && c !== agv) enviar(c, { tipo: "agv_espera", msg: agv === agvEsp ? "" : "Ahora manda la página del carro en modo Simulador." }); });
+  enviar(hmi, { tipo: "agv", en_linea: !!agv, sim: !!agv && agv !== agvEsp });
+  console.log(agv ? "Carro activo: " + (agv === agvEsp ? "ESP32 real" : "página en modo Simulador") : "Sin carro AGV");
+}
 let ultimaDisp = null;          // ¿se puede pedir? (el carro está en la posición de carga) — lo decide el HMI
 const tiendas = new Set();
 const vistas = new Set();       // páginas que solo MIRAN y manejan el carro real (AGV_Carro en modo "Carro ESP32")
@@ -59,17 +72,21 @@ wss.on("connection", (ws, req) => {
         }
         hmi = ws; ws.rol = "hmi";
         enviar(ws, { tipo: "hola_ok", tiendas: tiendas.size, agv: !!agv }); avisarTiendas();
-        enviar(agv, { tipo: "hmi", en_linea: true }); avisarVistas({ tipo: "hmi", en_linea: true });
+        [agvEsp, ...agvPaginas].forEach(c => enviar(c, { tipo: "hmi", en_linea: true })); avisarVistas({ tipo: "hmi", en_linea: true });
         console.log("HMI conectado");
       } else if (m.rol === "agv") {
-        if (agv && agv !== ws && agv.readyState === 1) { enviar(ws, { tipo: "error", msg: "Ya hay otro carro AGV conectado (¿el ESP32 del carro o la página del carro?). Solo puede haber uno." }); return ws.close(); }
-        agv = ws; ws.rol = "agv";
-        enviar(ws, { tipo: "hola_ok", hmi: !!hmi });
-        enviar(hmi, { tipo: "agv", en_linea: true }); avisarVistas({ tipo: "agv", en_linea: true });
-        console.log("Carro AGV conectado desde " + String(req.socket.remoteAddress).replace("::ffff:", ""));
+        ws.rol = "agv";
+        if (m.pagina) { agvPaginas.push(ws); console.log("Página del carro conectada (modo Simulador)"); }
+        else {
+          if (agvEsp && agvEsp !== ws) { try { agvEsp.close(); } catch (_) {} }   // el ESP32 se reconectó: la conexión vieja sobra
+          agvEsp = ws; avisarVistas({ tipo: "agv", en_linea: true });
+          console.log("Carro ESP32 conectado desde " + String(req.socket.remoteAddress).replace("::ffff:", ""));
+        }
+        actualizarAgv();
+        if (agv !== ws) enviar(ws, { tipo: "hola_ok", hmi: !!hmi, activo: false });     // espera su turno
       } else if (m.rol === "agv_vista") {
         ws.rol = "agv_vista"; vistas.add(ws);
-        enviar(ws, { tipo: "hola_ok", hmi: !!hmi, agv: !!agv });
+        enviar(ws, { tipo: "hola_ok", hmi: !!hmi, agv: !!agvEsp });
         console.log("Página del carro conectada (modo Carro ESP32)");
       } else {
         ws.rol = "tienda"; tiendas.add(ws);
@@ -95,11 +112,13 @@ wss.on("connection", (ws, req) => {
         r.ws = ws; if (r.ultimo) enviar(ws, r.ultimo);
       }
     } else if (ws.rol === "agv") {
-      if (AGV_A_HMI.includes(m.tipo)) { enviar(hmi, m); if (vistas.size) avisarVistas(m); }
+      if (!AGV_A_HMI.includes(m.tipo)) return;
+      if (ws === agv) enviar(hmi, m);                    // al HMI solo le habla el carro activo
+      if (ws === agvEsp && vistas.size) avisarVistas(m); // la página en modo "Carro real" siempre ve al ESP32
     } else if (ws.rol === "agv_vista") {
       if (m.tipo === "agv_ctl" && CTL_VISTA.includes(m.cmd)) {
-        if (!agv) return enviar(ws, { tipo: "error", msg: "El carro ESP32 no está conectado al servidor." });
-        enviar(agv, { tipo: "agv_ctl", cmd: m.cmd, on: !!m.on, v: Number(m.v) || 0 });
+        if (!agvEsp) return enviar(ws, { tipo: "error", msg: "El carro ESP32 no está conectado al servidor." });
+        enviar(agvEsp, { tipo: "agv_ctl", cmd: m.cmd, on: !!m.on, v: Number(m.v) || 0 });
       }
     } else if (ws.rol === "hmi" && m.tipo === "disponibilidad") {     // a TODAS las tiendas: pueden pedir o no
       ultimaDisp = { tipo: "disponibilidad", pedir: !!m.pedir, agv: String(m.agv || "").slice(0, 20), msg: String(m.msg || "").slice(0, 160) };
@@ -123,9 +142,11 @@ wss.on("connection", (ws, req) => {
         r.ultimo = { tipo: "estado", id, fase: "error", msg: "Se perdió la conexión con el dispensador. Tu pedido se canceló." };
         enviar(r.ws, r.ultimo); cerrarPedido(id);
       });
-      avisarTiendas(); enviar(agv, { tipo: "hmi", en_linea: false }); avisarVistas({ tipo: "hmi", en_linea: false }); console.log("HMI desconectado");
-    } else if (ws === agv) {
-      agv = null; enviar(hmi, { tipo: "agv", en_linea: false }); avisarVistas({ tipo: "agv", en_linea: false }); console.log("Carro AGV desconectado");
+      avisarTiendas(); [agvEsp, ...agvPaginas].forEach(c => enviar(c, { tipo: "hmi", en_linea: false })); avisarVistas({ tipo: "hmi", en_linea: false }); console.log("HMI desconectado");
+    } else if (ws.rol === "agv") {
+      const k = agvPaginas.indexOf(ws); if (k >= 0) agvPaginas.splice(k, 1);
+      if (ws === agvEsp) { agvEsp = null; avisarVistas({ tipo: "agv", en_linea: false }); console.log("Carro ESP32 desconectado"); }
+      actualizarAgv();
     } else if (vistas.delete(ws)) {
     } else if (tiendas.delete(ws)) avisarHmi();
   });
