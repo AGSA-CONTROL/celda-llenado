@@ -643,7 +643,35 @@ details summary:hover{color:var(--text)}
 #viewDisp details{color: var(--tenue); font-size: 13px; margin-bottom: 10px;}
 #viewDisp details summary{cursor: pointer; color: var(--azul);}
 #viewDisp details ol{margin: 6px 0 0; padding-left: 20px;}
-@media (max-width: 1180px){#viewDisp main{grid-template-columns: 1fr;}
+/* ---- acomodo v17b: la línea de dosificación (simulador) va GRANDE a la izquierda ---- */
+#viewDisp .dispApp .dspInds{grid-template-columns:repeat(3,minmax(0,1fr)) auto}
+#viewDisp .dspInds .portInd{padding:9px 12px}
+#viewDisp .dspInds .portInd b{font-size:14px}
+#viewDisp .dspCtl{display:flex;gap:8px;align-items:stretch}
+#viewDisp .dspCtl button{min-height:0;padding:8px 16px;font-weight:700}
+#viewDisp .dspCtl .b-emerg{min-width:200px}
+#viewDisp main{grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"linea izq" "der izq"}
+#viewDisp main > .lineaDos{grid-area:linea;margin:0}
+#viewDisp main > .col-izq{grid-area:izq}
+#viewDisp main > .col-der{grid-area:der}
+#viewDisp .lineaDos{padding:12px 16px 14px}
+#viewDisp .lineaTop{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+#viewDisp .lineaTop h2{margin:0;font-size:17px}
+#viewDisp .lineaTop .estados{display:flex;gap:16px;flex-wrap:wrap;font-size:14px}
+#viewDisp .lineaTop .led{width:14px;height:14px}
+#viewDisp .lineaDos .tolvas{gap:24px}
+#viewDisp .lineaDos .tsvg{max-width:300px}
+#viewDisp .lineaDos .tnombre{font-size:22px}
+#viewDisp .e2Barra{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,320px);gap:14px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--linea)}
+#viewDisp .e2Barra h2{margin-bottom:2px}
+#viewDisp .e2Barra .ayuda{margin:0}
+#viewDisp .col-der{margin-top:12px}
+#viewDisp .col-der [role=tablist]{display:flex}
+#viewDisp #dsp-filasServo,#viewDisp #dsp-filasVueltas{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+#viewDisp #dsp-filasServo .srv,#viewDisp #dsp-filasVueltas .srv{margin:0}
+#viewDisp #dsp-panelVueltas .vtGuardarGrande{max-width:420px}
+@media (max-width: 1180px){#viewDisp main{grid-template-columns: 1fr;grid-template-areas:"linea" "izq" "der"}
+#viewDisp .dispApp .dspInds{grid-template-columns:1fr 1fr}
 #viewDisp .col-izq{display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px;}
 #viewDisp .col-izq .grupo{margin: 0;}}
 @media (max-width: 640px){#viewDisp .tolvas{grid-template-columns: 1fr;}
@@ -941,35 +969,13 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
           <div class="portInd" id="dsp-indDisp"><i></i><div><b>DISPENSADOR SIN CONEXIÓN</b><small>—</small></div></div>
           <div class="portInd" id="dsp-indE2"><i></i><div><b>SENSOR E2 SIN CONEXIÓN</b><small>—</small></div></div>
           <div class="portInd" id="dsp-tiendaInd"><i></i><div><b>TIENDA SIN CONEXIÓN</b><small>—</small></div></div>
+          <div class="dspCtl" aria-label="Control">
+            <button id="dsp-btnEmerg" class="b-emerg" type="button">PARO DE EMERGENCIA</button>
+            <button id="dsp-btnReset" type="button">Reset</button>
+          </div>
         </div>
         <div id="dsp-banner" role="alert" hidden>⚠ PARO DE EMERGENCIA ACTIVO ⚠ — libera la emergencia y pulsa Reset</div>
 <div id="dsp-aviso" role="status" hidden><span id="dsp-txtAviso"></span><button id="dsp-btnAvisoOk" type="button">Entendido</button></div>
-
-<div class="topbar">
-  <section class="grupo" aria-labelledby="dsp-h-control">
-    <h2 id="dsp-h-control">Control</h2>
-    <div class="fila-control">
-      <button id="dsp-btnEmerg" class="b-emerg" type="button">PARO DE EMERGENCIA</button>
-      <button id="dsp-btnReset" type="button">Reset</button>
-    </div>
-  </section>
-
-  <section class="grupo" aria-labelledby="dsp-h-e2">
-    <h2 id="dsp-h-e2">Sensor E2 · pin 8 de la rueda</h2>
-    <div id="dsp-estadoE2" class="caja-e2" aria-live="polite">Sensor E2 sin conectar</div>
-    <p class="ayuda">Lo lee el Arduino de la rueda (pin 8, estación Llenado). Sin recipiente no dispensa.</p>
-  </section>
-
-  <section class="grupo" aria-labelledby="dsp-h-estado">
-    <h2 id="dsp-h-estado">Estado</h2>
-    <div class="estados">
-      <div><span class="led" id="dsp-ledListo" style="--c:#39d353"></span>Listo</div>
-      <div><span class="led" id="dsp-ledProceso" style="--c:#f1c40f"></span>Dispensando</div>
-      <div><span class="led" id="dsp-ledEspera" style="--c:#b57edc"></span>Espera E2</div>
-      <div><span class="led" id="dsp-ledEmerg" style="--c:#e74c3c"></span>Emergencia</div>
-    </div>
-  </section>
-</div>
 
 <main>
   <div class="col col-izq">
@@ -991,9 +997,22 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
 
   </div>
 
-  <section class="grupo" aria-labelledby="dsp-h-linea">
-    <h2 id="dsp-h-linea">Línea de dosificación</h2>
+  <section class="grupo lineaDos" aria-labelledby="dsp-h-linea">
+    <div class="lineaTop">
+      <h2 id="dsp-h-linea">Línea de dosificación</h2>
+      <div class="estados" aria-label="Estado">
+        <div><span class="led" id="dsp-ledListo" style="--c:#39d353"></span>Listo</div>
+        <div><span class="led" id="dsp-ledProceso" style="--c:#f1c40f"></span>Dispensando</div>
+        <div><span class="led" id="dsp-ledEspera" style="--c:#b57edc"></span>Espera E2</div>
+        <div><span class="led" id="dsp-ledEmerg" style="--c:#e74c3c"></span>Emergencia</div>
+      </div>
+    </div>
     <div class="tolvas" id="dsp-tolvas"></div>
+    <div class="e2Barra" aria-labelledby="dsp-h-e2">
+      <div><h2 id="dsp-h-e2">Sensor E2 · pin 8 de la rueda</h2>
+        <p class="ayuda">Lo lee el Arduino de la rueda (estación Llenado). Sin recipiente no dispensa.</p></div>
+      <div id="dsp-estadoE2" class="caja-e2" aria-live="polite">Sensor E2 sin conectar</div>
+    </div>
   </section>
 
   <div class="col col-der">
