@@ -283,6 +283,16 @@ body{font-size:clamp(15px,min(1.3vw,2.3vh),30px)}
 @keyframes parpadeo{50%{opacity:.25}}
 #otro:disabled{opacity:.6;cursor:default;box-shadow:none;transform:none}
 
+#salaBadge{bottom:3px!important;left:6px!important;font-size:11px!important;padding:3px 8px!important;opacity:.92}
+/* ===== elegir almacén (la tienda decide a dónde va el carro) ===== */
+.almSel{margin:2px 0 14px}
+.almSel h3{margin:0 0 8px;font-size:1em}
+.almBtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.almBtns button{font:inherit;font-weight:800;padding:12px 4px;border-radius:12px;border:2px solid var(--borde);background:var(--milpa3);color:var(--tinta);cursor:pointer;line-height:1.15}
+.almBtns button small{display:block;font-weight:600;font-size:.75em;color:var(--tenue)}
+.almBtns button.on{border-color:var(--maiz);background:linear-gradient(180deg,var(--oro1),var(--oro2));color:var(--tinta-osc)}
+.almBtns button.on small{color:var(--tinta-osc)}
+.almBtns button:disabled{opacity:.45;cursor:default}
 /* ===== v7: mismos colores que el HMI y el carro — negro con dorado ===== */
 :root{
   --milpa:#0c0f14; --milpa2:#161b23; --milpa3:#232b38;
@@ -490,6 +500,14 @@ body{background:
         <p class="ayuda" id="ayuda" aria-live="polite"></p>
         <div class="vasosSel" id="vasosSel"></div>
         <ul class="lista" id="lista"></ul>
+        <div class="almSel">
+          <h3>¿A qué almacén lo mandamos?</h3>
+          <div class="almBtns" id="almBtns">
+            <button type="button" data-a="1">Almacén 1<small>QR-E1</small></button>
+            <button type="button" data-a="2">Almacén 2<small>QR-E2</small></button>
+            <button type="button" data-a="3">Almacén 3<small>QR-E3</small></button>
+          </div>
+        </div>
         <button id="conf" class="conf" type="button" disabled>Confirmar pedido</button>
       </aside>
     </section>
@@ -584,6 +602,7 @@ let pedido = null;               // { id, vs:["pend"|"esp"|"sirv"|"hecho"], fin:
 let ws = null, enLinea = false, hmiOn = true, tReinicio = null, tCuenta = null;
 let disp = { pedir: true, msg: "", agv: "" };   // lo avisa el HMI: ¿el carro está en la posición de carga?
 let esperandoCarro = false;
+let almElegido = 0;                         // almacén al que va el pedido (lo elige el cliente en la tienda)
 const total = () => q[0] + q[1] + q[2];
 const vibra = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} };
 function reanimar(el, clase) { el.classList.remove(clase); void el.offsetWidth; el.classList.add(clase); }
@@ -705,9 +724,11 @@ function pintar() {
     : sinHmi ? "El dispensador no está disponible por ahora. Avisa al encargado."
     : t === 0 ? "Toca + en un costal para servir tu primer vaso."
     : falta > 0 ? `Te ${falta === 1 ? "falta 1 vaso" : `faltan ${falta} vasos`} para completar el lote.`
+    : !almElegido ? "Elige a qué almacén mandamos tu pedido."
     : sinCarro ? "Tu lote está listo. Podrás confirmarlo cuando el carro regrese a la posición de carga."
     : "¡Lote completo! Revisa y confirma tu pedido.";
-  $("conf").disabled = t !== LOTE || sinHmi || sinCarro;
+  $("conf").disabled = t !== LOTE || !almElegido || sinHmi || sinCarro;
+  document.querySelectorAll("#almBtns button").forEach(b => { b.classList.toggle("on", Number(b.dataset.a) === almElegido); b.disabled = !!pedido; });
   if (!pedido) marcarPaso(t === LOTE ? 1 : 0);   // con pedido en curso, los pasos los marca su avance
 }
 function marcarPaso(n) {
@@ -822,7 +843,8 @@ function pedir() {
   mensaje("Enviando tu pedido…");
   pantalla(1); estacion(-1); marcarPaso(2);
   const id = pedido.id, p = [...q];
-  setTimeout(() => enviar({ tipo: "pedido", id, p }), 800);       // p = porciones de la tolva 1, 2 y 3
+  const almacen = almElegido; pedido.almacen = almacen;
+  setTimeout(() => enviar({ tipo: "pedido", id, p, almacen }), 800);       // p = porciones de la tolva 1, 2 y 3
 }
 /* pedido entregado, pero el carro aún no vuelve a carga: se espera antes de dejar pedir otro */
 function esperarCarro() {
@@ -846,7 +868,7 @@ function actualizarDisp() {
 function reiniciar() {
   if (esperandoCarro) return;                    // aún no se puede pedir otro lote
   clearTimeout(tReinicio); clearInterval(tCuenta); tReinicio = null;
-  pedido = null; q.fill(0); vasosPrevios = "-"; pantalla(0); pintar();
+  pedido = null; q.fill(0); almElegido = 0; vasosPrevios = "-"; pantalla(0); pintar();
 }
 function mensaje(txt, clase) { const m = $("msg"); m.textContent = txt; m.className = clase || ""; }
 const TEXTO_VASO = { pend: "En espera", esp: "Colocando vaso", sirv: "Sirviendo…", hecho: "Servido", rech: "Rechazado · se sirve de nuevo" };
@@ -957,7 +979,7 @@ function recibir(m) {
       mostrarRuta(true); estacion(4); marcarPaso(3);
       $("segT").textContent = m.etapa === "descargando" ? `Llegó al Almacén ${d}` : m.etapa === "cargado" ? "Tu lote está listo" : "Tu pedido va en camino";
       mensaje(m.msg || (d ? `Va en camino al Almacén ${d}.` : "El carro sale a entregar tu lote."));
-      if (m.etapa === "cargado") { rutaDestino(0); rutaIr("carga"); }
+      if (m.etapa === "cargado") { rutaDestino(pedido && pedido.almacen || 0); rutaIr("carga"); }
       else if (d) { rutaDestino(d); rutaIr("a" + d); }
       break;
     }
@@ -1002,7 +1024,7 @@ async function demo(obj) {
     est({ fase: "vaso_listo", vaso: k + 1 }); await dormir(1300);
   }
   est({ fase: "pausa", msg: "Verificando la calidad de tus vasos…" }); await dormir(1800);
-  const d = 1 + Math.floor(Math.random() * 3);
+  const d = obj.almacen || 1;
   est({ fase: "entrega", etapa: "cargado", msg: "¡Lote completo y verificado! El carro AGV sale a entregarlo." }); await dormir(1600);
   est({ fase: "entrega", etapa: "en_ruta", almacen: d, msg: `Tu lote va en camino al Almacén ${d}.` }); await dormir(4200);
   disp = { pedir: false, agv: "DESCARGANDO", msg: "El carro está entregando un pedido. Podrás hacer tu pedido cuando regrese a la posición de carga." };
@@ -1012,6 +1034,10 @@ async function demo(obj) {
   recibir({ tipo: "disponibilidad", pedir: true, agv: "CARGA", msg: "" });
 }
 
+document.querySelectorAll("#almBtns button").forEach(b => b.addEventListener("click", () => {
+  if (pedido) return;
+  almElegido = Number(b.dataset.a); vibra(); pintar();
+}));
 construir(); pintar(); conectar();
 </script>
 </body>

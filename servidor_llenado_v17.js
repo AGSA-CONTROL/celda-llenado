@@ -391,11 +391,13 @@ wss.on("connection", (ws, req) => {
         const p = m.p;
         const ok = idValido(m.id) && Array.isArray(p) && p.length === 3 && p.every(x => Number.isInteger(x) && x >= 0) && p[0] + p[1] + p[2] === 3;
         if (!ok) return enviar(ws, { tipo: "estado", id: String(m.id).slice(0, 40), fase: "error", msg: "Pedido no válido." });
+        const almacen = Number(m.almacen);
+        if (!(almacen >= 1 && almacen <= 3 && Number.isInteger(almacen))) return enviar(ws, { tipo: "estado", id: m.id, fase: "error", msg: "Elige a qué almacén va tu pedido." });
         if (!S.hmi) return enviar(ws, { tipo: "estado", id: m.id, fase: "error", msg: "El dispensador no está disponible en este momento." });
         if (S.pedidos.has(m.id)) return;
         S.pedidos.set(m.id, { ws, ultimo: null });
-        enviar(S.hmi, { tipo: "pedido", id: m.id, p });
-        console.log("[" + S.nombre + "] Pedido", m.id, p.join(","));
+        enviar(S.hmi, { tipo: "pedido", id: m.id, p, almacen });
+        console.log("[" + S.nombre + "] Pedido", m.id, p.join(","), "-> Almacén " + almacen);
       } else if (m.tipo === "consulta" && idValido(m.id)) {   // la tienda se reconectó: recupera el estado
         const r = S.pedidos.get(m.id);
         if (!r) return enviar(ws, { tipo: "estado", id: m.id, fase: "error", msg: "No encuentro tu pedido." });

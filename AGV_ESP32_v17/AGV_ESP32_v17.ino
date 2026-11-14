@@ -1771,6 +1771,11 @@ void procesarServidor(uint8_t* payload, size_t length) {
       String idj = "null";
       JsonVariant idv = doc["lote"]["id"];
       if (!idv.isNull()) serializeJson(idv, idj);
+      int dTienda = doc["lote"]["destino"] | 0;           // la tienda eligió el almacén
+      if (dTienda >= 1 && dTienda <= 3) {
+        carroModoDest = dTienda;
+        Serial.printf("La tienda eligio el Almacen %d.\n", dTienda);
+      }
       carroSalir(idj);
     } else if (strcmp(cmd, "vaso") == 0) {
       carroVaso(doc["g"] | 0);

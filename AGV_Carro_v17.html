@@ -628,6 +628,11 @@ function evento(ev, extra){ mandar(Object.assign({ tipo:"agv_evento", ev, lote:l
 function salir(lote){
   if(st.estado !== "CARGA"){ toast("El carro no está en la posición de carga."); return false; }
   if(!MODO_SIM){ ctl("salir"); log("Orden enviada al carro: salir ahora."); return true; }
+  const dTienda = lote && Number(lote.destino) || 0;     // la tienda eligió el almacén
+  if(dTienda >= 1 && dTienda <= 3){
+    cfg.modo = String(dTienda); $("#modoDest").value = cfg.modo; guardarCfg();
+    log(`🛒 La tienda eligió el Almacén ${dTienda} para este pedido.`); toast(`La tienda mandó el pedido al Almacén ${dTienda}`);
+  }
   if(!elegirDestino()){                                  // v17: sin almacén elegido el carro NO sale
     st.estado = "ESPERA_DESTINO"; st.pendLote = lote || {};
     log("⚠ El lote está listo, pero falta elegir el almacén. El carro sale en cuanto lo elijas.");
