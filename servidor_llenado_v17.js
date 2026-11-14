@@ -22,6 +22,18 @@ const server = http.createServer((req, res) => {
     return res.end(`<meta charset="utf-8"><title>LLENADO</title><h1>LLENADO</h1><ul>${lista}</ul>`);
   }
   if (nombre === "sala_eliminada.html") return paginaSalaEliminada(req, res);
+  if (nombre === "elegir_sala.html") return paginaElegirSala(req, res);
+  if (nombre === "salas.json") { res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); return res.end(JSON.stringify(listaSalas())); }
+  if (nombre === "elegir_sala.html") return paginaElegirSala(req, res);
+  /* Las 3 páginas sin ?sala= en el link: primero se elige la sala */
+  if (["HMI_Llenado_v17.html", "Tienda_LaCosecha_v17.html", "AGV_Carro_v17.html"].includes(nombre)) {
+    const q = new URL(req.url, "http://x").searchParams;
+    if (!q.get("sala")) {
+      q.set("volver", nombre);
+      res.writeHead(302, { Location: "/elegir_sala.html?" + q.toString(), "Cache-Control": "no-store" });
+      return res.end();
+    }
+  }
   if (!nombre.endsWith(".html")) { res.writeHead(404); return res.end("No encontrado"); }
   fs.readFile(path.join(DIR, nombre), (e, d) => {
     if (e) { res.writeHead(404); return res.end("No encontrado"); }
@@ -29,6 +41,123 @@ const server = http.createServer((req, res) => {
     res.end(d);
   });
 });
+
+/* Pantalla para ELEGIR SALA: las que ya existen o una nueva */
+function paginaElegirSala(req, res) {
+  const q = new URL(req.url, "http://x").searchParams;
+  let volver = path.basename(q.get("volver") || "");
+  if (!/^[\w-]+\.html$/.test(volver) || !fs.existsSync(path.join(DIR, volver))) volver = "HMI_Llenado_v17.html";
+  q.delete("volver"); q.delete("sala");
+  const extra = q.toString();                          // otros datos del link (ej. modo=sim) se conservan
+  const titulo = { "HMI_Llenado_v17.html": "HMI de la rueda", "Tienda_LaCosecha_v17.html": "Tienda La Cosecha", "AGV_Carro_v17.html": "Carro AGV" }[volver] || volver;
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elegir sala</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0c0f14;color:#eef2f7;font-family:"Segoe UI",system-ui,sans-serif}
+.c{background:#161b23;border:1px solid #2c3544;border-radius:14px;padding:26px;max-width:480px;width:calc(100% - 32px);box-sizing:border-box}
+h1{font-size:22px;margin:0 0 4px}.sub{color:#98a3b3;margin:0 0 18px}h2{font-size:13px;letter-spacing:1px;color:#98a3b3;margin:18px 0 8px;text-transform:uppercase}
+.s{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #3b4659;border-radius:10px;margin-bottom:8px;background:#0b0e12}
+.s.ult{border-color:#f5a623}.s div{flex:1;min-width:0}.s b{font-size:16px}.s small{display:block;color:#98a3b3}
+.r{display:flex;gap:8px}input{flex:1;min-width:0;font:inherit;padding:10px;border-radius:10px;border:1px solid #3b4659;background:#0b0e12;color:#eef2f7}
+button{font:inherit;font-weight:700;padding:10px 16px;border-radius:10px;border:0;background:#33c469;color:#06210f;cursor:pointer}
+.vacio{color:#98a3b3;padding:8px 0}.aviso{color:#98a3b3;font-size:13px;margin-top:8px;min-height:18px}</style></head><body>
+<div class="c"><h1>Elige tu sala</h1><p class="sub">Vas a abrir: <b>${titulo}</b></p>
+<h2>Salas que ya existen</h2><div id="lista"><div class="vacio">Buscando salas…</div></div>
+<h2>O crea una nueva</h2>
+<div class="r"><input id="n" maxlength="20" placeholder="nombre de la sala (sin espacios)"><button id="b">Crear y entrar</button></div>
+<div class="aviso" id="av">Solo letras, números, - y _. Sin espacios ni acentos.</div></div>
+<script>
+const VOLVER = ${JSON.stringify("/" + volver)}, EXTRA = ${JSON.stringify(extra)};
+const limpia = x => String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let ult = ""; try { ult = limpia(localStorage.getItem("celda_sala")); } catch(_){}
+let lista = [];
+function ir(n){ n = limpia(n); if(!n) return; try { localStorage.setItem("celda_sala", n); } catch(_){}
+  location.href = VOLVER + "?sala=" + encodeURIComponent(n) + (EXTRA ? "&" + EXTRA : ""); }
+function pintar(){
+  const el = document.getElementById("lista");
+  if(!lista.length){ el.innerHTML = '<div class="vacio">Todavía no hay salas abiertas. Crea una nueva abajo.</div>'; }
+  else el.innerHTML = lista.map(x => {
+    const det = [x.paginas + " página" + (x.paginas === 1 ? "" : "s"), x.hmi ? "HMI" : "", x.tiendas ? x.tiendas + " tienda" + (x.tiendas === 1 ? "" : "s") : "", x.carro_fisico ? "carro físico" : ""].filter(Boolean).join(" · ");
+    return '<div class="s' + (x.nombre === ult ? ' ult' : '') + '"><div><b>' + esc(x.nombre) + '</b>' + (x.nombre === ult ? ' <small style="display:inline;color:#f5a623">(la última que usaste)</small>' : '') + '<small>' + esc(det) + '</small></div><button data-n="' + esc(x.nombre) + '">Entrar</button></div>';
+  }).join("");
+  el.querySelectorAll("[data-n]").forEach(b => b.onclick = () => ir(b.dataset.n));
+  revisar();
+}
+function revisar(){
+  const n = limpia(document.getElementById("n").value), b = document.getElementById("b"), av = document.getElementById("av");
+  const existe = n && lista.some(x => x.nombre === n);
+  b.textContent = existe ? "Entrar" : "Crear y entrar";
+  av.textContent = !n ? "Solo letras, números, - y _. Sin espacios ni acentos." : existe ? 'La sala "' + n + '" ya existe: vas a entrar a ella.' : 'Se va a crear la sala "' + n + '".';
+}
+const inp = document.getElementById("n");
+if(ult) inp.value = ult;
+inp.oninput = revisar; inp.onkeydown = e => { if(e.key === "Enter") ir(inp.value); };
+document.getElementById("b").onclick = () => ir(inp.value);
+let ws;
+function conectar(){
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
+  ws.onopen = () => ws.send(JSON.stringify({ tipo: "salas_lista" }));
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch(_){ return; } if(m.tipo === "salas"){ lista = m.lista || []; pintar(); } };
+  ws.onclose = () => setTimeout(conectar, 3000);
+}
+conectar();
+setInterval(() => { if(ws && ws.readyState === 1) ws.send(JSON.stringify({ tipo: "salas_lista" })); }, 3000);
+revisar();
+</script></body></html>`);
+}
+
+/* Página para ELEGIR SALA (sale al abrir un link sin ?sala=): entras a una que ya existe o creas una nueva */
+function paginaElegirSala(req, res) {
+  const q = new URL(req.url, "http://x").searchParams;
+  let volver = path.basename(q.get("volver") || "");
+  if (!/^[\w-]+\.html$/.test(volver) || !fs.existsSync(path.join(DIR, volver))) volver = "";
+  const titulo = { "HMI_Llenado_v17.html": "HMI de la rueda", "Tienda_LaCosecha_v17.html": "Tienda La Cosecha", "AGV_Carro_v17.html": "Carro AGV" }[volver] || "la celda";
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+  res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Elegir sala</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0c0f14;color:#eef2f7;font-family:"Segoe UI",system-ui,sans-serif}
+.c{background:#161b23;border:1px solid #2c3544;border-radius:14px;padding:26px;max-width:480px;width:calc(100% - 32px);box-sizing:border-box}
+h1{font-size:22px;margin:0 0 4px}p{color:#98a3b3;margin:0 0 16px}h2{font-size:14px;letter-spacing:1px;text-transform:uppercase;color:#98a3b3;margin:18px 0 8px}
+.s{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;background:#0b0e12;border:1px solid #3b4659;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.s:hover{border-color:#33c469}.s b{font-size:16px}.s small{display:block;color:#98a3b3}.s .e{margin-left:auto;font-weight:700;color:#33c469}
+.r{display:flex;gap:8px}input{flex:1;min-width:0;font:inherit;padding:10px;border-radius:10px;border:1px solid #3b4659;background:#0b0e12;color:#eef2f7}
+button.b{font:inherit;font-weight:700;padding:10px 16px;border-radius:10px;border:0;background:#33c469;color:#06210f;cursor:pointer;white-space:nowrap}
+#ayuda{font-size:13px;color:#98a3b3;margin-top:8px;min-height:18px}.vacio{color:#98a3b3;font-size:14px}</style></head><body>
+<div class="c"><h1>¿A qué sala quieres entrar?</h1><p>Vas a abrir: <b>${titulo}</b></p>
+<h2>Salas que ya existen</h2><div id="lista"><div class="vacio">Buscando salas…</div></div>
+<h2>O escribe el nombre</h2>
+<div class="r"><input id="n" maxlength="20" placeholder="nombre de la sala" autocomplete="off"><button class="b" id="b">Entrar</button></div>
+<div id="ayuda"></div></div>
+<script>
+const VOLVER = ${JSON.stringify(volver ? "/" + volver : "/")};
+const limpia = x => String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let salas = [];
+try { document.getElementById("n").value = localStorage.getItem("celda_sala") || ""; } catch(_){}
+function ir(n){ n = limpia(n); if(!n) return; try { localStorage.setItem("celda_sala", n); } catch(_){} location.href = VOLVER + "?sala=" + encodeURIComponent(n); }
+function ayuda(){
+  const n = limpia(document.getElementById("n").value), b = document.getElementById("b"), a = document.getElementById("ayuda");
+  if(!n){ b.textContent = "Entrar"; a.textContent = "Solo letras, números, - y _ (sin espacios ni acentos)."; return; }
+  const ya = salas.some(x => x.nombre === n);
+  b.textContent = ya ? "Entrar" : "Crear sala";
+  a.textContent = ya ? 'La sala "' + n + '" ya existe: vas a entrar a ella.' : 'La sala "' + n + '" no existe: se va a crear nueva.';
+}
+async function cargar(){
+  try { salas = await (await fetch("/salas.json", { cache:"no-store" })).json(); } catch(_){ salas = []; }
+  const l = document.getElementById("lista");
+  if(!salas.length) l.innerHTML = '<div class="vacio">Todavía no hay ninguna sala abierta. Escribe un nombre para crear una.</div>';
+  else l.innerHTML = salas.map(x => {
+    const d = [x.paginas + " página" + (x.paginas === 1 ? "" : "s"), x.hmi ? "HMI" : "", x.tiendas ? x.tiendas + " tienda" + (x.tiendas === 1 ? "" : "s") : "", x.carro_fisico ? "carro físico" : ""].filter(Boolean).join(" · ");
+    return '<button class="s" type="button" data-n="' + esc(x.nombre) + '"><div><b>' + esc(x.nombre) + '</b><small>' + esc(d) + '</small></div><span class="e">Entrar ›</span></button>';
+  }).join("");
+  l.querySelectorAll("[data-n]").forEach(b => b.onclick = () => ir(b.dataset.n));
+  ayuda();
+}
+const inp = document.getElementById("n");
+inp.oninput = ayuda; inp.onkeydown = e => { if(e.key === "Enter") ir(inp.value); };
+document.getElementById("b").onclick = () => ir(inp.value);
+cargar(); setInterval(cargar, 3000);
+</script></body></html>`);
+}
 
 /* Página que se ve cuando eliminan la sala en la que estabas: eliges otra y regresas */
 function paginaSalaEliminada(req, res) {
@@ -169,6 +298,7 @@ wss.on("connection", (ws, req) => {
       enviar(ws, { tipo: "salas", lista: listaSalas() }); avisarListaSalas();
       return;
     }
+    if (m.tipo === "salas_lista" && !ws.rol) return enviar(ws, { tipo: "salas", lista: listaSalas() });   // pantalla "Elegir sala"
     if (ws.rol === "vigia") {
       if (m.tipo === "salas_lista") enviar(ws, { tipo: "salas", lista: listaSalas() });
       else if (m.tipo === "eliminar_sala") {
@@ -243,6 +373,16 @@ wss.on("connection", (ws, req) => {
         enviar(c, { tipo: "agv_permiso", estado: "rechazado", sala: S.nombre });
         avisarCarros(S); console.log("[" + S.nombre + "] Carro " + id + " rechazado");
       }
+      return;
+    }
+
+    /* Posición del carro -> las tiendas de la sala (su carrito se mueve igual).
+       La manda la página del carro que manda: la de Simulador activa, o la que mira al carro ESP32 real. */
+    if (m.tipo === "agv_pos") {
+      const vale = (ws.rol === "agv" && ws === S.agv && S.agvPaginas.includes(ws)) || (ws.rol === "agv_vista" && S.agvEsp && S.agv === S.agvEsp);
+      if (!vale) return;
+      const o = { tipo: "agv_pos", p: Math.max(0, Math.min(4, Number(m.p) || 0)), estado: String(m.estado || "").slice(0, 20), destino: Math.max(0, Math.min(3, Number(m.destino) | 0)), descargando: !!m.descargando };
+      S.tiendas.forEach(t => enviar(t, o));
       return;
     }
 
@@ -365,7 +505,7 @@ setInterval(() => wss.clients.forEach(c => { try { c.ping(); } catch (_) {} }), 
 
 server.listen(PORT, () => {
   if (NUBE) {
-    console.log(`\nServidor listo en la NUBE (v17). Link fijo (agrega ?sala=tunombre al final para tu propia sala):\n  HMI:       ${NUBE}/HMI_Llenado_v17.html\n  Tienda:    ${NUBE}/Tienda_LaCosecha_v17.html\n  Carro AGV: ${NUBE}/AGV_Carro_v17.html\n  En el panel del ESP32, en "Servidor", escribe: ${NUBE.replace(/^https?:\/\//, "")}  puerto 443`);
+    console.log(`\nServidor listo en la NUBE (v17). Link fijo (al abrirlo pide elegir la sala, o agrega ?sala=nombre al final):\n  HMI:       ${NUBE}/HMI_Llenado_v17.html\n  Tienda:    ${NUBE}/Tienda_LaCosecha_v17.html\n  Carro AGV: ${NUBE}/AGV_Carro_v17.html\n  En el panel del ESP32, en "Servidor", escribe: ${NUBE.replace(/^https?:\/\//, "")}  puerto 443`);
     return;
   }
   if (PUENTE_NUBE) console.log(`\nMODO PUENTE: el carro ESP32 se conecta a esta laptop y se pasa a ${PUENTE_NUBE}\n  Abre el HMI, la tienda y el carro desde el link de la nube (no desde localhost).`);

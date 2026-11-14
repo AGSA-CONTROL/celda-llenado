@@ -780,6 +780,12 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
 (function(){
   const limpia = x => (String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20));
   let s = ""; try { s = limpia(new URLSearchParams(location.search).get("sala")); } catch(_){}
+  if(!s && location.protocol.startsWith("http")){      // link sin sala: primero se elige (o se crea) la sala
+    try { window.stop(); } catch(_){}
+    const pag = location.pathname.split("/").pop() || "";
+    location.replace("/elegir_sala.html?volver=" + encodeURIComponent(pag));
+    return;
+  }
   if(!s){ try { s = limpia(localStorage.getItem("celda_sala")); } catch(_){} }
   if(!s) s = "principal";
   try { localStorage.setItem("celda_sala", s); } catch(_){}
@@ -1333,7 +1339,7 @@ function cambiarModo(sim){
   const hayAlgo = (typeof CTL !== "undefined") && (CTL.gin.conectado || CTL.disp.conectado);
   if(hayAlgo && !confirm(`¿Cambiar a ${sim ? "MODO SIMULADOR" : "MODO FÍSICO"}?\nSe desconectan los equipos y la cola de lotes se vacía.`)) return;
   try{ localStorage.setItem(MODO_KEY, sim ? "sim" : "fisico"); }catch(_){}
-  location.href = location.pathname;                                  // recarga sin ?modo=
+  location.href = location.pathname + "?sala=" + encodeURIComponent(window.SALA || "principal");   // recarga sin ?modo= (misma sala)
 }
 /* ======================================================================
    HMI: Rueda de Ginebra

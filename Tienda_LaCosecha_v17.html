@@ -376,6 +376,12 @@ body{background:
 (function(){
   const limpia = x => (String(x||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9_-]/g,"").slice(0,20));
   let s = ""; try { s = limpia(new URLSearchParams(location.search).get("sala")); } catch(_){}
+  if(!s && location.protocol.startsWith("http")){      // link sin sala: primero se elige (o se crea) la sala
+    try { window.stop(); } catch(_){}
+    const pag = location.pathname.split("/").pop() || "";
+    location.replace("/elegir_sala.html?volver=" + encodeURIComponent(pag));
+    return;
+  }
   if(!s){ try { s = limpia(localStorage.getItem("celda_sala")); } catch(_){} }
   if(!s) s = "principal";
   try { localStorage.setItem("celda_sala", s); } catch(_){}
@@ -732,7 +738,35 @@ function dibujarCarroT() {
   const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
   $("carroT").setAttribute("transform", `translate(${a.x.toFixed(1)} ${a.y.toFixed(1)}) rotate(${ang.toFixed(1)})`);
 }
+/* ===== Carrito sincronizado con la página del carro (agv_pos) =====
+   Cuando llegan posiciones del carro, el carrito de aquí va EXACTO donde va el carro; si no llegan, se anima solo. */
+const SYNC = { t: 0, objetivo: 0, anim: null };
+function sAvance(p) {
+  const T = [0, RUTA.paradas.a1, RUTA.paradas.a2, RUTA.paradas.a3, RUTA.L];
+  const i = Math.min(3, Math.floor(p)), f = p - i;
+  return T[i] + (T[i + 1] - T[i]) * f;
+}
+function sincronizado() { return Date.now() - SYNC.t < 2500; }
+function posCarro(m) {
+  if ($("ruta").hasAttribute("hidden")) return;           // solo cuando se ve el recorrido de tu pedido
+  if (!RUTA.L) prepararRuta();
+  SYNC.t = Date.now();
+  if (RUTA.anim) { cancelAnimationFrame(RUTA.anim); RUTA.anim = null; }
+  let obj = sAvance(m.p);
+  if (m.p >= 3.999 || m.estado === "CARGA") obj = (RUTA.s > RUTA.L / 2) ? RUTA.L : 0;
+  SYNC.objetivo = obj;
+  if (SYNC.anim) return;
+  const paso = () => {
+    const d = SYNC.objetivo - RUTA.s;
+    if (Math.abs(d) > RUTA.L / 3) RUTA.s = SYNC.objetivo; else RUTA.s += d * 0.25;
+    if (RUTA.s >= RUTA.L - 0.5 && SYNC.objetivo >= RUTA.L - 0.5) { RUTA.s = 0; SYNC.objetivo = 0; }
+    dibujarCarroT();
+    SYNC.anim = sincronizado() && Math.abs(SYNC.objetivo - RUTA.s) > 0.3 ? requestAnimationFrame(paso) : null;
+  };
+  SYNC.anim = requestAnimationFrame(paso);
+}
 function rutaIr(k) {                       // avanza siguiendo la línea (solo hacia adelante)
+  if (sincronizado()) return;              // el carro real/simulado manda la posición
   RUTA.meta = k === "vuelta" ? RUTA.L - 1 : (RUTA.paradas[k] ?? 0);
   if (RUTA.anim) return;
   let t0 = performance.now();
@@ -888,6 +922,7 @@ function recibir(m) {
     return;
   }
   if (m.tipo === "hmi") { hmiOn = !!m.en_linea; if (!hmiOn) disp = { pedir: true, msg: "", agv: "" }; etiqueta(); pintar(); return; }
+  if (m.tipo === "agv_pos") { posCarro(m); return; }
   if (m.tipo === "disponibilidad") { disp = { pedir: !!m.pedir, msg: m.msg || "", agv: m.agv || "" }; actualizarDisp(); return; }
   if (m.tipo !== "estado" || !pedido || (m.id && m.id !== pedido.id)) return;
   const i = Math.min(2, Math.max(0, (m.vaso || 1) - 1)), g = GRANOS[(m.grano || 1) - 1];
