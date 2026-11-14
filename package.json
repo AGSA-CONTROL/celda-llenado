@@ -1,0 +1,1 @@
+{"name":"celda-llenado","version":"17.0.0","private":true,"engines":{"node":">=18"},"scripts":{"start":"node servidor_llenado_v17.js"},"dependencies":{"ws":"^8.18.0"}}
