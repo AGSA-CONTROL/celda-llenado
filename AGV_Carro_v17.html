@@ -691,6 +691,19 @@ function entregar(n){
 function enCarga(){ st.s = S.carga; st.lado = 0; st.estado = "CARGA"; st.lote = null; cfg.modo = "0"; $("#modoDest").value = "0"; log("🚚 En la posición de carga: listo para el siguiente lote."); evento("en_carga"); }
 
 let last = performance.now();
+/* ===== RELOJ QUE NO SE FRENA: con la ventana del carro escondida (otra pestaña o ventana encima),
+   el navegador frena setInterval a 1 vez por segundo o menos y el carro simulado casi no avanzaba.
+   Un Worker sigue marcando el paso normal: el carro hace su recorrido aunque no estés viendo su página. ===== */
+function pulsoFiable(fn, ms){
+  let w = null, id = null;
+  try{
+    const url = URL.createObjectURL(new Blob([`let t=null;onmessage=e=>{clearInterval(t);if(e.data>0)t=setInterval(()=>postMessage(0),e.data)}`], { type:"text/javascript" }));
+    w = new Worker(url); URL.revokeObjectURL(url);
+    w.onmessage = () => { try{ fn(); }catch(e){ console.error(e); } };
+    w.postMessage(ms);
+  }catch(_){ w = null; id = setInterval(fn, ms); }
+  return { stop(){ if(w){ w.postMessage(0); w.terminate(); w = null; } if(id){ clearInterval(id); id = null; } } };
+}
 function tick(){
   const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
   if(MODO_SIM){ if(!st.pausado) pasoSimulador(dt); }
@@ -874,7 +887,7 @@ function publicarPos(){
   ultPos = { p, t:now, e };
   mandar({ tipo:"agv_pos", p, estado:e, destino: st.lote ? st.lote.destino : 0, descargando: e === "DESCARGANDO" });
 }
-setInterval(publicarPos, 150);
+pulsoFiable(publicarPos, 150);
 function deHmi(m){
   switch(m.cmd){
     case "despachar": salir(m.lote || {}); break;
@@ -1018,7 +1031,7 @@ function render(){
   setInterval(() => { $("#reloj").textContent = new Date().toLocaleTimeString("es-MX", { hour12:false }); }, 500);
   log(MODO_SIM ? "Modo simulador: carro virtual en la posición de carga." : "Carro real: esperando los datos del carro ESP32…");
   render(); conectarServidor();
-  setInterval(tick, 40);
+  pulsoFiable(tick, 40);                                 // sigue andando aunque la página no esté a la vista
 })();
 </script>
 </body>
