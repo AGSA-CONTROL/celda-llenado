@@ -27,6 +27,15 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .btn:active:not(:disabled){background:var(--yellow);color:#181305;transform:translateY(1px)}
 .btn:disabled{opacity:.45;cursor:default}
 .btn.sm{min-height:44px;font-size:15px;padding:6px 14px}
+.actGrid{display:grid;gap:10px}
+.actFila{display:grid;grid-template-columns:minmax(150px,1fr) 52px 100px 30px 52px minmax(170px,1.2fr);gap:8px;align-items:center}
+.actFila>span{font-weight:700}
+.actFila input[type=number]{text-align:center;font-size:18px;font-weight:700;padding:8px 4px;min-width:0}
+.actFila em{font-style:normal;color:var(--muted)}
+.actSent{display:flex;gap:8px;align-items:center;font-weight:600}
+.actBotones{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.actInfo{margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.25);font-size:14px}
+@media (max-width:900px){.actFila{grid-template-columns:1fr 52px 1fr 30px 52px}.actFila>span,.actFila .green,.actSent{grid-column:1/-1}}
 .btn.green{background:var(--green);color:#04170a;border-color:var(--green)}
 .btn.red{background:linear-gradient(180deg,#ee5a5f,var(--red));color:#1c0506;border-color:var(--red)}
 .btn.red:hover:not(:disabled){background:#ff6a6e}
@@ -554,6 +563,14 @@ details summary:hover{color:var(--text)}
 #viewDisp .vtHold.on{background:#2e9e4f;border-color:#2e9e4f;color:#fff}
 #viewDisp .vtMedir.on{background:#d9a21b;border-color:#d9a21b;color:#1b1204}
 #viewDisp .vtTres>span{grid-column:1/-1;font-weight:700}
+#viewDisp .agFila{display:grid;grid-template-columns:minmax(0,1fr) 38px 64px 22px 38px 44px;gap:6px;align-items:center;margin-top:8px}
+#viewDisp .agFila span{font-weight:700;font-size:14px}
+#viewDisp .agFila input{text-align:center;font-size:16px;font-weight:700;min-width:0;padding:6px 2px}
+#viewDisp .agFila em{font-style:normal;color:var(--muted,#98a3b3);font-size:13px}
+#viewDisp .agFila button{min-height:36px;padding:4px;font-size:17px;font-weight:800}
+#viewDisp .agFila .agIr{font-size:13px}
+#viewDisp .agAng{font-family:Consolas,monospace;font-size:13px;color:#f5a623}
+#viewDisp .agProbar{width:100%;margin-top:10px;min-height:40px}
 #viewDisp .vtTres{display:grid;grid-template-columns:40px minmax(60px,90px) 40px minmax(0,1fr);gap:6px;align-items:center}
 #viewDisp .vtTres input{text-align:center;font-size:16px;font-weight:700}
 #viewDisp .vtTres .b-gira{min-height:42px;padding:6px 8px}
@@ -983,23 +1000,24 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
     <div role="tablist" aria-label="Configuración">
       <button role="tab" id="dsp-tabServos" aria-selected="true" aria-controls="dsp-panelServos" type="button">Servos</button>
       <button role="tab" id="dsp-tabSensores" aria-selected="false" aria-controls="dsp-panelSensores" type="button">Sensores</button>
-      <button role="tab" id="dsp-tabVueltas" aria-selected="false" aria-controls="dsp-panelVueltas" type="button">Tiempo y vueltas</button>
+      <button role="tab" id="dsp-tabVueltas" aria-selected="false" aria-controls="dsp-panelVueltas" type="button">Calibrar (grados)</button>
     </div>
 
     <section class="grupo" id="dsp-panelServos" role="tabpanel" aria-labelledby="dsp-tabServos">
       <h2>Configuración de servos</h2>
-      <p class="ayuda">Prueba cada servo por separado: <b>Gira</b> lo hace girar sin parar y <b>Para</b> lo detiene. Solo con la máquina en reposo; durante un pedido cada servo se mueve solo.</p>
+      <p class="ayuda">Prueba cada compuerta por separado: <b>Abrir</b> la lleva a su ángulo abierto y <b>Cerrar</b> a su ángulo cerrado. Solo con la máquina en reposo; durante un pedido cada servo se mueve solo.</p>
       <div id="dsp-filasServo"></div>
     </section>
 
     <section class="grupo" id="dsp-panelVueltas" role="tabpanel" aria-labelledby="dsp-tabVueltas" hidden>
-      <h2>Dosificación por vueltas</h2>
-      <p class="ayuda">Cada servo dispensa por <b>tiempo</b>. Para cada servo:</p>
+      <h2>Calibración de compuertas (servos de 180°)</h2>
+      <p class="ayuda">Cada tolva tiene una compuerta. Para cada servo:</p>
       <ol class="ayuda vtPasos">
-        <li><b>Tiempo de 1 vuelta:</b> escribe el tiempo (en milisegundos, 1000 ms = 1 segundo) y pulsa <b>"Probar 1 vuelta"</b>. Si se pasa de la vuelta, baja el tiempo; si le falta, súbelo. Repite hasta que dé la vuelta exacta.</li>
-        <li><b>Vueltas al dispensar:</b> pon cuántas vueltas va a dar cada vez que dispense. Con <b>"Probar"</b> lo ves.</li>
+        <li><b>Cerrado:</b> con <b>−</b> y <b>+</b> mueve el servo hasta que la compuerta tape bien la tolva (no debe caer grano).</li>
+        <li><b>Abierto:</b> igual, hasta que la compuerta quede abierta y caiga el grano.</li>
+        <li><b>Tiempo abierto</b> y <b>veces</b>: cuánto tiempo se queda abierta y cuántas veces abre para llenar un recipiente. Con <b>"Probar porción"</b> lo ves.</li>
       </ol>
-      <p class="ayuda">Cuando las 3 tolvas queden bien, pulsa <b>"Guardar en el Arduino"</b>: guarda el tiempo y las vueltas de cada tolva (no se borran al apagarlo).</p>
+      <p class="ayuda">El servo se mueve en cuanto cambias los grados. Cuando las 3 queden bien, pulsa <b>"Guardar en el Arduino"</b> (no se borra al apagarlo).</p>
       <div id="dsp-filasVueltas"></div>
       <input type="number" id="dsp-vtPausa" min="0" max="10000" step="100" hidden><button id="dsp-vtLeer" type="button" hidden>Leer</button>
       <button id="dsp-vtGuardar" class="b-gira vtGuardarGrande" type="button">💾 Guardar en el Arduino</button>
@@ -1158,6 +1176,27 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
             <h3>Mover manualmente a un grado exacto (prueba)</h3>
             <div class="viewHeader" style="padding:0 0 10px">Escribe el grado (0–360°) al que quieres que la rueda se mueva ahora mismo para quedar en cada estación y presiona "Mover". Esto NO guarda el valor como calibración (eso se hace arriba, con "Enviar"); solo mueve el motor para que verifiques a ojo dónde queda.</div>
             <div id="moveDegList"></div>
+          </section>
+          <section class="grp wide" id="actPanel">
+            <h3>Actuador lineal (servo de 360°) · se mueve por tiempo</h3>
+            <div class="viewHeader" style="padding:0 0 10px">El servo de 360° no va a un ángulo: gira mientras tiene señal. Por eso el actuador se mueve por <b>tiempo</b>. Prueba con los botones hasta que <b>extienda completo</b> y <b>regrese completo</b>, y luego pulsa <b>"Guardar en el Arduino"</b>.</div>
+            <div class="actGrid">
+              <div class="actFila"><span>Tiempo para EXTENDER</span>
+                <button class="btn sm" type="button" data-act="ida:-100">−</button><input type="number" id="actIda" min="50" max="20000" step="10" value="900"><em>ms</em><button class="btn sm" type="button" data-act="ida:100">+</button>
+                <button class="btn sm green" type="button" id="actProbarIda">▶ Probar extender</button></div>
+              <div class="actFila"><span>Tiempo para REGRESAR</span>
+                <button class="btn sm" type="button" data-act="reg:-100">−</button><input type="number" id="actReg" min="50" max="20000" step="10" value="900"><em>ms</em><button class="btn sm" type="button" data-act="reg:100">+</button>
+                <button class="btn sm green" type="button" id="actProbarReg">◀ Probar regresar</button></div>
+              <div class="actFila"><span>Velocidad</span>
+                <input type="range" id="actVel" min="100" max="500" step="25" value="400" style="grid-column:2/5"><em id="actVelTxt">400</em>
+                <label class="actSent"><input type="checkbox" id="actSent"> Invertir sentido</label></div>
+            </div>
+            <div class="actBotones">
+              <button class="btn red" type="button" id="actStop">■ Detener</button>
+              <button class="btn" type="button" id="actLeer">Leer del Arduino</button>
+              <button class="btn green" type="button" id="actGuardar">💾 Guardar en el Arduino</button>
+            </div>
+            <div class="actInfo" id="actInfo">Conecta la rueda para leer los tiempos guardados.</div>
           </section>
         </div>
       </div>
@@ -1349,6 +1388,11 @@ class SimGinebra{
     this.stGrados[idx] = q(g);   // cada estación guarda su propio ángulo (igual que el firmware)
   }
   gradosLinea(){ return "GRADOS," + this.stGrados.map(g => Math.round(g*100)).join(",") + "," + PASOS_REV_SIM; }
+  actLinea(){
+    if(!this.act){ try{ this.act = JSON.parse(localStorage.getItem("hmi01_simAct") || "null"); }catch(_){} }
+    if(!this.act) this.act = { ida:900, reg:900, vel:400, sent:1 };
+    const a = this.act; return `ACT_T,${a.ida},${a.reg},${a.vel},${a.sent}`;
+  }
   iniciarDwell(){ this.tCarga = null; this.tTapa = null; this.d.estado = 1; this.evaluar(); }
   tareaHecha(s){ const c = this.vaso[s]; return s === 1 ? c.lleno : s === 2 ? c.tapadoHecho : c.verificado; }
   /* ¿la rueda puede indexar? cada orificio con vaso debe tener su tarea hecha y su OK */
@@ -1587,6 +1631,18 @@ class SimGinebra{
           }
         }
       } break;
+      case "ACT_T?": this.emit(this.actLinea()); break;
+      case "ACT_T": {
+        const v = arg.split(",").map(Number);
+        if(v.length === 4 && v[0] >= 50 && v[0] <= 20000 && v[1] >= 50 && v[1] <= 20000 && v[2] >= 50 && v[2] <= 500 && (v[3] === 1 || v[3] === -1)){
+          this.act = { ida:v[0], reg:v[1], vel:v[2], sent:v[3] }; try{ localStorage.setItem("hmi01_simAct", JSON.stringify(this.act)); }catch(_){}
+          this.emit(this.actLinea());
+        } else this.emit("ERR,ACT_T");
+      } break;
+      case "ACT_EXT": this.emit("ACT,extender"); break;
+      case "ACT_RET": this.emit("ACT,regresar"); break;
+      case "ACT_GIRO": this.emit("ACT,giro"); break;
+      case "ACT_STOP": this.emit("ACT,paro"); break;
       case "SIM_AUTOOK": this.simAutoOk = arg === "1"; break;
       case "SIM_SINTAPA": this.sinTapaNext = true; break;
       case "RECHAZOS_RESET": this.d.rech = 0; break;
@@ -1613,7 +1669,7 @@ class SimDispensador{
     this.reset();
     this.tSensor = 0;
     this.timer = setInterval(() => this.tick(), 50);
-    this.tArranque = setTimeout(() => { this.emit("READY"); this.avisoTodos(); this.vueltas(); }, 400);
+    this.tArranque = setTimeout(() => { this.emit("READY"); this.avisoTodos(); this.vueltas(); }, 400);   // vueltas() = manda ANGULOS
   }
   reset(){
     this.estado = "IDLE"; this.previo = "IDLE";
@@ -1621,20 +1677,17 @@ class SimDispensador{
     this.armado = false; this.vaso = false; this.vasoArmado = false; this.soltar = false;
     this.emergencia = false; this.tVaso = 0; this.tIni = 0; this.tPausa = 0; this.restante = 0; this.giroN = 0;
     this.sv = ["LISTO", "LISTO", "LISTO"];
-    if(!this.vt) this.vt = { ms:[1000, 1000, 1000], v:[1, 1, 1], pausa:1000, pos:[0, 0, 0] };
+    if(!this.ag) this.ag = { c:[0, 0, 0], a:[90, 90, 90], ms:[1000, 1000, 1000], k:[1, 1, 1], pausa:800 };   // como la EEPROM del Arduino
   }
   cerrar(){ clearInterval(this.timer); clearTimeout(this.tArranque); clearTimeout(this.tMan); }
-  /* calibración por vueltas + HOME (como el Arduino real, se "guarda" mientras dure la página) */
-  vueltas(){ const t = this.vt; this.emit(`VUELTAS,${t.ms.join(",")},${t.v.join(",")},${t.pausa}`); for(let i = 0; i < 3; i++) this.emit(`POS,${i + 1},${Math.round(t.pos[i])}`); }
-  manual(i, dir, dur, tipo){
+  /* calibración por GRADOS de las compuertas (como el Arduino real, se "guarda" mientras dure la página) */
+  vueltas(){ const g = this.ag; this.emit(`ANGULOS,${g.c.join(",")},${g.a.join(",")},${g.ms.join(",")},${g.k.join(",")},${g.pausa}`); }
+  prueba(i, k){
     if(this.emergencia || this.estado !== "IDLE"){ this.emit("ERR,OCUPADO"); return; }
     clearTimeout(this.tMan);
-    this.sv[i] = "GIRANDO"; this.aviso(i);
-    this.tMan = setTimeout(() => {
-      const m = this.vt.ms[i]; this.vt.pos[i] = tipo === 3 ? 0 : (((this.vt.pos[i] + dir * dur) % m) + m) % m;
-      this.sv[i] = "LISTO"; this.aviso(i);
-      this.emit(`${tipo === 1 ? "PRUEBA_OK" : tipo === 2 ? "AJUSTE_OK" : "HOME_OK"},${i + 1}`); this.emit(`POS,${i + 1},${Math.round(this.vt.pos[i])}`);
-    }, Math.min(dur, 4000));
+    this.sv[i] = "GIRANDO"; this.aviso(i); this.emit(`PRUEBA,${i + 1},${k}`);
+    const dur = Math.min(k * this.ag.ms[i] + (k - 1) * this.ag.pausa, 6000);
+    this.tMan = setTimeout(() => { this.sv[i] = "LISTO"; this.aviso(i); this.emit(`PRUEBA_OK,${i + 1}`); }, dur);
   }
   aviso(i){ this.emit(`SERVO,${i + 1},${this.sv[i]}`); }
   avisoTodos(){ for(let i = 0; i < 3; i++) this.aviso(i); }
@@ -1719,22 +1772,19 @@ class SimDispensador{
     const c = String(cmd).trim(); if(!c) return;
     if(c.length === 1 && "?APRLXE".includes(c)) return this.simple(c);
     if(c === "C?") return this.vueltas();
-    if(c.startsWith("CP,")){ const x = Number(c.slice(3)); if(x >= 0 && x <= 10000){ this.vt.pausa = x; this.vueltas(); } else this.emit("ERR,FORMATO"); return; }
+    if(c.startsWith("CP,")){ const x = Number(c.slice(3)); if(x >= 0 && x <= 10000){ this.ag.pausa = x; this.vueltas(); } else this.emit("ERR,FORMATO"); return; }
     const k = c[0], v = c.slice(1).split(",").filter(x => x !== "").map(Number);
-    if(k === "C"){ if(v.length === 3 && v[0] >= 1 && v[0] <= 3 && v[1] >= 100 && v[1] <= 20000 && v[2] >= 1 && v[2] <= 20){ this.vt.ms[v[0] - 1] = v[1]; this.vt.v[v[0] - 1] = v[2]; this.vueltas(); } else this.emit("ERR,FORMATO"); return; }
-    if(k === "T"){ if(v.length === 2 && v[0] >= 1 && v[0] <= 3 && v[1] >= 1 && v[1] <= 20){ this.manual(v[0] - 1, 1, v[1] * this.vt.ms[v[0] - 1], 1); this.emit(`PRUEBA,${v[0]},${v[1]}`); } else this.emit("ERR,FORMATO"); return; }
-    if(k === "J"){ if(v.length === 2 && v[0] >= 1 && v[0] <= 3 && v[1] && Math.abs(v[1]) <= 3000) this.manual(v[0] - 1, Math.sign(v[1]), Math.abs(v[1]), 2); else this.emit("ERR,FORMATO"); return; }
-    if(k === "H"){ if(v.length === 1 && v[0] >= 1 && v[0] <= 3){ const i = v[0] - 1, f = (this.vt.ms[i] - this.vt.pos[i]) % this.vt.ms[i]; if(f < 15){ this.vt.pos[i] = 0; this.emit(`HOME_OK,${v[0]}`); this.emit(`POS,${v[0]},0`); } else this.manual(i, 1, f, 3); } else this.emit("ERR,FORMATO"); return; }
-    if(k === "Z"){ if(v.length === 1 && v[0] >= 1 && v[0] <= 3){ this.vt.pos[v[0] - 1] = 0; this.emit(`HOME_FIJO,${v[0]}`); this.emit(`POS,${v[0]},0`); } else this.emit("ERR,FORMATO"); return; }
+    if(k === "C"){ if(v.length === 5 && v[0] >= 1 && v[0] <= 3 && v[1] >= 0 && v[1] <= 180 && v[2] >= 0 && v[2] <= 180 && v[3] >= 100 && v[3] <= 10000 && v[4] >= 1 && v[4] <= 10){
+        const i = v[0] - 1; this.ag.c[i] = v[1]; this.ag.a[i] = v[2]; this.ag.ms[i] = v[3]; this.ag.k[i] = v[4]; this.vueltas(); } else this.emit("ERR,FORMATO"); return; }
+    if(k === "M"){ if(v.length === 2 && v[0] >= 1 && v[0] <= 3 && v[1] >= 0 && v[1] <= 180){ if(this.emergencia || this.estado !== "IDLE") this.emit("ERR,OCUPADO"); else this.emit(`MOV,${v[0]},${v[1]}`); } else this.emit("ERR,FORMATO"); return; }
+    if(k === "T"){ if(v.length === 2 && v[0] >= 1 && v[0] <= 3 && v[1] >= 1 && v[1] <= 10) this.prueba(v[0] - 1, v[1]); else this.emit("ERR,FORMATO"); return; }
     if(k === "S"){ if(v.length === 3) this.armar(v); else this.emit("ERR,FORMATO"); }
     else if(k === "V"){ if(v.length === 1 && (v[0] === 0 || v[0] === 1)) this.fijarVaso(v[0] === 1); else this.emit("ERR,FORMATO"); }
     else if(k === "G"){
       if(v.length !== 2 || v[0] < 1 || v[0] > 3 || (v[1] !== 0 && v[1] !== 1)) this.emit("ERR,FORMATO");
       else if(this.emergencia || this.estado !== "IDLE") this.emit("ERR,OCUPADO");
       else {
-        const i = v[0] - 1; this.gT = this.gT || [0, 0, 0];
-        if(v[1]) this.gT[i] = this.gT[i] || Date.now();
-        else if(this.gT[i]){ const m = this.vt.ms[i]; this.vt.pos[i] = (((this.vt.pos[i] + Date.now() - this.gT[i]) % m) + m) % m; this.gT[i] = 0; }
+        const i = v[0] - 1;
         this.sv[i] = v[1] ? "GIRANDO" : "LISTO"; this.emit((v[1] ? "GIRA," : "PARA,") + v[0]); this.aviso(i);
       }
     }
@@ -1810,6 +1860,8 @@ function onGrados(l){
 function alLinea(k, linea){
   logCtl(k, "RX", linea);
   if(k === "gin" && linea.startsWith("GRADOS,")){ onGrados(linea); return; }
+  if(k === "gin" && linea.startsWith("ACT_T,")){ onActT(linea); return; }
+  if(k === "gin" && linea === "ERR,ACT_T"){ ACT.guardando = false; actAviso("✖ El Arduino no aceptó los tiempos (el actuador debe estar en reposo).", true); return; }
   if(k === "gin"){
     const d = parseGIN(linea);
     if(d){ CTL.gin.equivocado = false; onGIN(d); return; }
@@ -1948,6 +2000,7 @@ async function conectar(k, modo){
       }
     }
     enviarCtl(k, "GRADOS?");
+    enviarCtl(k, "ACT_T?");                      // tiempos del actuador lineal guardados
     enviarCtl(k, "E2?");                         // firmware unido: pide el estado del sensor E2 (pin 8)
   }
   if(k === "disp" && window.DISP){
@@ -2666,6 +2719,48 @@ $("#moveDegList").addEventListener("click", e => {
   if(![0, 3, 5, 10].includes(H.gin.estado)){ toast("La rueda debe estar detenida para mover (espera el home o detén la marcha)"); return; }
   enviarCtl("gin", `GOTO_DEG:${i}:${v}`); toast(`Moviendo a ${v}° y guardado como ${NOMBRES_EST_CAL[i]}`);
 });
+/* ---------- actuador lineal (servo 360°, por tiempo) ---------- */
+const ACT = { ida:900, reg:900, vel:400, sent:1, leido:false };
+function actAviso(t, mal){ const e = $("#actInfo"); e.textContent = t; e.style.color = mal ? "var(--red)" : ""; }
+function actListo(){
+  if(!CTL.gin.conectado){ actAviso("✖ La rueda no está conectada (pestaña Comunicación).", true); return false; }
+  return true;
+}
+function actValores(){
+  const ida = Math.round(+$("#actIda").value), reg = Math.round(+$("#actReg").value), vel = Math.round(+$("#actVel").value);
+  if(!(ida >= 50 && ida <= 20000 && reg >= 50 && reg <= 20000)){ actAviso("✖ Los tiempos deben estar entre 50 y 20000 ms.", true); return null; }
+  return { ida, reg, vel, sent: $("#actSent").checked ? -1 : 1 };
+}
+function actPintar(){
+  $("#actIda").value = ACT.ida; $("#actReg").value = ACT.reg; $("#actVel").value = ACT.vel; $("#actVelTxt").textContent = ACT.vel; $("#actSent").checked = ACT.sent === -1;
+  actAviso(`Guardado en el Arduino: extender ${ACT.ida} ms · regresar ${ACT.reg} ms · velocidad ${ACT.vel}${ACT.sent === -1 ? " · sentido invertido" : ""}.`);
+}
+function onActT(l){
+  const p = l.split(",").map(Number);
+  ACT.ida = p[1]; ACT.reg = p[2]; ACT.vel = p[3]; ACT.sent = p[4]; ACT.leido = true;
+  actPintar(); if(ACT.guardando){ ACT.guardando = false; actAviso("✔ " + $("#actInfo").textContent); }
+}
+/* para probar se manda primero la velocidad y el sentido que están en pantalla (sin cambiar los tiempos guardados) */
+function actProbar(ms){
+  if(!actListo()) return; const x = actValores(); if(!x) return;
+  if(x.vel !== ACT.vel || x.sent !== ACT.sent) enviarCtl("gin", `ACT_T:${ACT.ida},${ACT.reg},${x.vel},${x.sent}`);
+  enviarCtl("gin", `ACT_GIRO:${ms}`);
+  actAviso(ms > 0 ? `Extendiendo ${ms} ms… ¿llegó al final? Si le faltó, sube el tiempo; si forzó, bájalo.` : `Regresando ${-ms} ms… ¿regresó completo? Si le faltó, sube el tiempo.`);
+}
+$$("[data-act]").forEach(b => b.addEventListener("click", () => {
+  const [q, d] = b.dataset.act.split(":"), inp = $(q === "ida" ? "#actIda" : "#actReg");
+  inp.value = Math.max(50, Math.min(20000, Math.round(+inp.value || 0) + Number(d)));
+}));
+$("#actVel").addEventListener("input", e => $("#actVelTxt").textContent = e.target.value);
+$("#actProbarIda").addEventListener("click", () => { const x = actValores(); if(x) actProbar(x.ida); });
+$("#actProbarReg").addEventListener("click", () => { const x = actValores(); if(x) actProbar(-x.reg); });
+$("#actStop").addEventListener("click", () => { if(actListo()){ enviarCtl("gin", "ACT_STOP"); actAviso("Actuador detenido."); } });
+$("#actLeer").addEventListener("click", () => { if(actListo()){ actAviso("Leyendo del Arduino…"); enviarCtl("gin", "ACT_T?"); } });
+$("#actGuardar").addEventListener("click", () => {
+  if(!actListo()) return; const x = actValores(); if(!x) return;
+  actAviso("Guardando en el Arduino…"); ACT.guardando = true; enviarCtl("gin", `ACT_T:${x.ida},${x.reg},${x.vel},${x.sent}`);
+  clearTimeout(ACT.tResp); ACT.tResp = setTimeout(() => { if(ACT.guardando){ ACT.guardando = false; actAviso("✖ El Arduino no contestó. Sube el programa nuevo Arduino_Rueda_v17.ino a la rueda.", true); } }, 2500);
+});
 $("#rawGin").addEventListener("keydown", e => {
   if(e.key !== "Enter") return; e.preventDefault();
   const v = e.target.value.trim(); if(v){ enviarCtl("gin", v); e.target.value = ""; }
@@ -3048,7 +3143,7 @@ const ESTADOS = {                       // color, texto, parpadea
   NC:         ["#3a424d", "NO CONECTADO", false],
   LISTO:      ["#39d353", "LISTO", false],
   MOVIENDO:   ["#f1c40f", "DISPENSANDO", true],
-  GIRANDO:    ["#3aa0ff", "GIRANDO", true],
+  GIRANDO:    ["#3aa0ff", "ABIERTA", true],
   PARO:       ["#ff9f1a", "EN PARO", false],
   ESPERA:     ["#b57edc", "ESPERA RECIPIENTE", true],
   EMERGENCIA: ["#e74c3c", "EMERGENCIA", true],
@@ -3185,8 +3280,8 @@ function construirServos() {
     d.className = "srv";
     d.innerHTML = `<div class="srv-top"><span class="srv-nom" id="dsp-srvNom${i}"></span><span class="srv-est" id="dsp-srvEst${i}"></span></div>
       <div class="rejilla2" style="margin-top:0">
-        <button id="dsp-btnGira${i}" class="b-gira" type="button">Gira</button>
-        <button id="dsp-btnPara${i}" class="b-para" type="button">Para</button>
+        <button id="dsp-btnGira${i}" class="b-gira" type="button">Abrir</button>
+        <button id="dsp-btnPara${i}" class="b-para" type="button">Cerrar</button>
       </div>`;
     cont.appendChild(d);
     $("btnGira" + i).addEventListener("click", () => girarServo(i, true));
@@ -3194,116 +3289,115 @@ function construirServos() {
   }
 }
 
-/* ---------- dosificación por vueltas + HOME ---------- */
-const VT = { ms: [1000, 1000, 1000], v: [1, 1, 1], pausa: 1000, pos: [0, 0, 0], leido: false };
+/* ---------- calibración de compuertas por GRADOS (servos de 180°) ---------- */
+const VT = { c: [0, 0, 0], a: [90, 90, 90], ms: [1000, 1000, 1000], k: [1, 1, 1], pausa: 800, ang: [null, null, null], leido: false };
 function construirVueltas() {
   const cont = $("filasVueltas");
+  const fila = (i, id, txt, min, max, paso, unidad, ir) => `<div class="agFila"><span>${txt}</span>
+      <button type="button" id="dsp-${id}Menos${i}" title="−${paso}">−</button>
+      <input type="number" id="dsp-${id}${i}" min="${min}" max="${max}" step="1"><em>${unidad}</em>
+      <button type="button" id="dsp-${id}Mas${i}" title="+${paso}">+</button>
+      ${ir ? `<button type="button" class="agIr" id="dsp-${id}Ir${i}">Ir</button>` : "<i></i>"}</div>`;
   for (let i = 0; i < N; i++) {
     const d = document.createElement("div");
     d.className = "srv";
-    d.innerHTML = `<div class="srv-top"><span class="srv-nom" id="dsp-vtNom${i}">Servo ${i + 1}</span></div>
-      <div class="vtPaso"><b>1</b><div class="vtTres">
-        <span>Tiempo de 1 vuelta (ms)</span>
-        <button type="button" id="dsp-vtMsMenos${i}" title="−50 ms">−</button>
-        <input type="number" id="dsp-vtMs${i}" min="100" max="20000" step="10">
-        <button type="button" id="dsp-vtMsMas${i}" title="+50 ms">+</button>
-        <button type="button" class="b-gira" id="dsp-vtProbar1${i}">Probar 1 vuelta</button>
-      </div></div>
-      <div class="vtPaso"><b>2</b><div class="vtTres">
-        <span>Vueltas al dispensar</span>
-        <button type="button" id="dsp-vtMenos${i}">−</button>
-        <input type="number" id="dsp-vtV${i}" min="1" max="20" step="1">
-        <button type="button" id="dsp-vtMas${i}">+</button>
-        <button type="button" class="b-gira" id="dsp-vtProbar${i}">Probar</button>
-      </div></div>`;
+    d.innerHTML = `<div class="srv-top"><span class="srv-nom" id="dsp-vtNom${i}">Servo ${i + 1}</span><span class="agAng" id="dsp-agAng${i}">—</span></div>
+      ${fila(i, "agC", "Cerrado", 0, 180, 5, "°", true)}
+      ${fila(i, "agA", "Abierto", 0, 180, 5, "°", true)}
+      ${fila(i, "agT", "Tiempo abierto", 100, 10000, 100, "ms", false)}
+      ${fila(i, "agK", "Veces por porción", 1, 10, 1, "", false)}
+      <button type="button" class="b-gira agProbar" id="dsp-vtProbar${i}">▶ Probar porción</button>`;
     cont.appendChild(d);
-    /* 1) TIEMPO de una vuelta: se escribe a mano, se ajusta con − / + (50 ms) y se prueba */
-    const tiempo = d2 => { const inp = $("vtMs" + i); inp.value = Math.max(100, Math.min(20000, Math.round(+inp.value || 1000) + d2)); vtGuardar(i); };
-    $("vtMsMenos" + i).addEventListener("click", () => tiempo(-50));
-    $("vtMsMas" + i).addEventListener("click", () => tiempo(50));
-    $("vtMs" + i).addEventListener("change", () => tiempo(0));
-    $("vtProbar1" + i).addEventListener("click", () => vtProbar(i, 1));
-    /* 2) VUELTAS al dispensar y prueba */
-    const vuelt = d2 => { const inp = $("vtV" + i); inp.value = Math.max(1, Math.min(20, (+inp.value || 1) + d2)); vtGuardar(i); };
-    $("vtMenos" + i).addEventListener("click", () => vuelt(-1));
-    $("vtMas" + i).addEventListener("click", () => vuelt(1));
-    $("vtV" + i).addEventListener("change", () => vuelt(0));
+    const ajusta = (id, paso, min, max, mover) => {
+      const f = dd => { const inp = $(id + i); inp.value = Math.max(min, Math.min(max, Math.round(+inp.value || 0) + dd)); if (mover) agMover(i, +inp.value); };
+      $(id + "Menos" + i).addEventListener("click", () => f(-paso));
+      $(id + "Mas" + i).addEventListener("click", () => f(paso));
+      $(id + i).addEventListener("change", () => f(0));
+      if (mover) $(id + "Ir" + i).addEventListener("click", () => f(0));
+    };
+    ajusta("agC", 5, 0, 180, true); ajusta("agA", 5, 0, 180, true);
+    ajusta("agT", 100, 100, 10000, false); ajusta("agK", 1, 1, 10, false);
     $("vtProbar" + i).addEventListener("click", () => vtProbar(i));
   }
   $("vtGuardar").addEventListener("click", vtGuardarTodo);
-  $("vtLeer").addEventListener("click", () => vtComando("C?", "Leer calibración por vueltas"));
+  $("vtLeer").addEventListener("click", () => vtComando("C?", "Leer calibración"));
 }
-VT.hold = [false, false, false]; VT.medir = [0, 0, 0];
-function vtGuardar(i) {                                  // manda al Arduino lo de ese servo (se guarda en su memoria)
-  const x = vtValores(i); if (!x) return;
-  if (x.ms === VT.ms[i] && x.v === VT.v[i]) return;
-  vtComando(`C,${i + 1},${x.ms},${x.v}`, `Servo ${i + 1}: guardar ${x.v} vuelta${x.v > 1 ? "s" : ""} de ${x.ms} ms`);
+function agMover(i, g) {                                 // mueve el servo YA al ángulo (para ver dónde queda)
+  vtComando(`M,${i + 1},${g}`, `Servo ${i + 1} (${cal.granos[i]}): mover a ${g}°`);
 }
 function vtAviso(txt, mal) { const e = $("vtInfo"); e.textContent = txt; e.style.color = mal ? "#ff6b6b" : ""; }
 function vtComando(c, desc, sinEspera) {
   if (!link) { vtAviso("✖ El puerto Dispensado no está conectado. Conéctalo en la pestaña Comunicación.", true); return false; }
   if (!st.listo) { vtAviso("✖ El Arduino del dispensador todavía no responde (no llegó READY).", true); return false; }
   if (st.dispensando) { vtAviso("✖ Espera a que termine de dispensar: los servos se calibran con la máquina en reposo.", true); return false; }
+  if (!c) return false;
   if (tx(c)) { log(`Enviado: ${desc} ('${c}')`); vtAviso(`Enviado: ${desc}…`); }
   if (sinEspera) return true;
   clearTimeout(VT.tResp);
   VT.tResp = setTimeout(() => {                           // el programa viejo del Arduino no contesta estos comandos
-    vtAviso("✖ El Arduino no contestó. Sube el programa nuevo Arduino_Dispensador_v17.ino al Arduino del dispensador (el que tiene \"Tiempo y vueltas\").", true);
+    vtAviso("✖ El Arduino no contestó. Sube el programa nuevo Arduino_Dispensador_v17.ino (el de servos de 180°) al Arduino del dispensador.", true);
   }, 2500);
   return true;
 }
 function vtValores(i) {
-  const ms = Math.round(+$("vtMs" + i).value), v = Math.round(+$("vtV" + i).value);
-  if (!(ms >= 100 && ms <= 20000)) { alert(`Servo ${i + 1}: el tiempo por vuelta debe estar entre 100 y 20000 ms.`); return null; }
-  if (!(v >= 1 && v <= 20)) { alert(`Servo ${i + 1}: las vueltas por porción deben estar entre 1 y 20.`); return null; }
-  return { ms, v };
+  const c = Math.round(+$("agC" + i).value), a = Math.round(+$("agA" + i).value), ms = Math.round(+$("agT" + i).value), k = Math.round(+$("agK" + i).value);
+  if (!(c >= 0 && c <= 180 && a >= 0 && a <= 180)) { alert(`Servo ${i + 1}: los grados deben estar entre 0 y 180.`); return null; }
+  if (c === a) { alert(`Servo ${i + 1}: el ángulo cerrado y el abierto no pueden ser iguales.`); return null; }
+  if (!(ms >= 100 && ms <= 10000)) { alert(`Servo ${i + 1}: el tiempo abierto debe estar entre 100 y 10000 ms.`); return null; }
+  if (!(k >= 1 && k <= 10)) { alert(`Servo ${i + 1}: las veces por porción deben estar entre 1 y 10.`); return null; }
+  return { c, a, ms, k };
 }
-function vtProbar(i, k) {                                // k = 1: una vuelta; sin k: las vueltas del dispensado
+const vtLinea = (i, x) => `C,${i + 1},${x.c},${x.a},${x.ms},${x.k}`;
+function vtProbar(i) {                                   // guarda lo de ese servo y abre/cierra sus veces
   const x = vtValores(i); if (!x) return;
-  if (!link || !st.listo) return vtComando("", "");
-  if (x.ms !== VT.ms[i] || x.v !== VT.v[i]) tx(`C,${i + 1},${x.ms},${x.v}`);
-  const n = k || x.v; VT.ultK = k || 0;
-  vtComando(`T,${i + 1},${n}`, k ? `Servo ${i + 1}: probar 1 vuelta de ${x.ms} ms` : `Servo ${i + 1}: probar dispensado (${x.v} vuelta${x.v > 1 ? "s" : ""} de ${x.ms} ms)`);
+  if (!link || !st.listo || st.dispensando) return vtComando("", "");
+  tx(vtLinea(i, x));
+  vtComando(`T,${i + 1},${x.k}`, `Servo ${i + 1}: probar porción (abre ${x.k} ${x.k > 1 ? "veces" : "vez"} ${x.ms} ms)`);
 }
 function vtGuardarTodo() {
   if (!link || !st.listo || st.dispensando) return vtComando("", "");
   const xs = []; for (let i = 0; i < N; i++) { const x = vtValores(i); if (!x) return; xs.push(x); }
-  const pausa = Math.round(+$("vtPausa").value);
-  if (!(pausa >= 0 && pausa <= 10000)) { alert("La pausa entre vueltas debe estar entre 0 y 10000 ms."); return; }
-  xs.forEach((x, i) => tx(`C,${i + 1},${x.ms},${x.v}`));
-  vtComando(`CP,${pausa}`, "Guardar tiempo y vueltas de las 3 tolvas");
-  VT.guardando = true;
-  log(`Calibración por vueltas enviada al Arduino: ${xs.map((x, i) => `${cal.granos[i]} ${x.v}×${x.ms} ms`).join(" · ")} · pausa ${pausa} ms.`);
+  xs.forEach((x, i) => tx(vtLinea(i, x)));
+  VT.guardando = N + 1;                                   // respuestas ANGULOS que van a llegar (una por servo + la de C?)
+  vtComando("C?", "Guardar la calibración de las 3 compuertas");
+  log(`Calibración por grados enviada al Arduino: ${xs.map((x, i) => `${cal.granos[i]} ${x.c}°→${x.a}°, ${x.ms} ms ×${x.k}`).join(" · ")}.`);
 }
-function pintarVueltas(soloPos) {
+function pintarVueltas(soloAng) {
   for (let i = 0; i < N; i++) {
     $("vtNom" + i).textContent = `Servo ${i + 1} · ${cal.granos[i]}`;
-    if (!soloPos) {
-      if (document.activeElement !== $("vtMs" + i)) $("vtMs" + i).value = VT.ms[i];
-      if (document.activeElement !== $("vtV" + i)) $("vtV" + i).value = VT.v[i];
-    }
+    $("agAng" + i).textContent = VT.ang[i] === null ? "—" : `ahora en ${VT.ang[i]}°`;
+    if (soloAng) continue;
+    [["agC", VT.c], ["agA", VT.a], ["agT", VT.ms], ["agK", VT.k]].forEach(([id, arr]) => { if (document.activeElement !== $(id + i)) $(id + i).value = arr[i]; });
   }
-  if (!soloPos && document.activeElement !== $("vtPausa")) $("vtPausa").value = VT.pausa;
-  if (soloPos) return;
+  if (soloAng) return;
+  if (document.activeElement !== $("vtPausa")) $("vtPausa").value = VT.pausa;
   $("vtInfo").style.color = "";
   $("vtInfo").textContent = !VT.leido ? "Aún no se lee la calibración del Arduino (conecta el puerto Dispensado)."
-    : "Guardado en el Arduino: " + VT.ms.map((m, i) => `${cal.granos[i]} ${VT.v[i]} vuelta${VT.v[i] > 1 ? "s" : ""} de ${m} ms`).join(" · ");
+    : "Guardado en el Arduino: " + VT.c.map((c, i) => `${cal.granos[i]} cerrado ${c}° · abierto ${VT.a[i]}° · ${VT.ms[i]} ms ×${VT.k[i]}`).join("  |  ");
 }
 function procesarVueltas(msg) {                          // true si el mensaje era de esta sección
   const p = msg.split(",");
-  if (["VUELTAS", "POS", "PRUEBA", "PRUEBA_OK", "AJUSTE_OK", "HOME_OK", "HOME_FIJO", "GIRA", "PARA"].includes(p[0])) clearTimeout(VT.tResp);
+  if (["ANGULOS", "MOV", "PRUEBA", "PRUEBA_OK", "GIRA", "PARA"].includes(p[0])) clearTimeout(VT.tResp);
   if (msg === "ERR,OCUPADO" && VT.tResp) { clearTimeout(VT.tResp); VT.tResp = null; vtAviso("✖ El dispensador está ocupado (tiene un lote en curso o en paro). Espera a que esté en reposo.", true); return false; }
-  if (p[0] === "VUELTAS" && p.length >= 8) {
-    VT.ms = p.slice(1, 4).map(Number); VT.v = p.slice(4, 7).map(Number); VT.pausa = +p[7]; VT.leido = true;
+  if (p[0] === "ANGULOS" && p.length >= 14) {
+    const n = p.slice(1).map(Number);
+    VT.c = n.slice(0, 3); VT.a = n.slice(3, 6); VT.ms = n.slice(6, 9); VT.k = n.slice(9, 12); VT.pausa = n[12]; VT.leido = true;
     pintarVueltas();
-    if (VT.guardando) { VT.guardando = false; $("vtInfo").textContent = "✔ " + $("vtInfo").textContent; }
+    if (VT.guardando && --VT.guardando === 0) $("vtInfo").textContent = "✔ " + $("vtInfo").textContent;
     return true;
   }
-  if (p[0] === "POS" && p.length >= 3) { const i = +p[1] - 1; if (i >= 0 && i < N) { VT.pos[i] = +p[2] || 0; pintarVueltas(true); } return true; }
-  if (["PRUEBA", "PRUEBA_OK", "AJUSTE_OK", "HOME_OK", "HOME_FIJO"].includes(p[0])) {
+  if (p[0] === "MOV" && p.length >= 3) {
+    const i = +p[1] - 1; if (i >= 0 && i < N) { VT.ang[i] = +p[2]; pintarVueltas(true); vtAviso(`Servo ${i + 1} (${cal.granos[i]}): en ${p[2]}°.`); }
+    return true;
+  }
+  if (p[0] === "GIRA" || p[0] === "PARA") {                // Abrir / Cerrar desde la pestaña Servos
+    const i = +p[1] - 1; if (i >= 0 && i < N) { VT.ang[i] = p[0] === "GIRA" ? VT.a[i] : VT.c[i]; pintarVueltas(true); }
+    return false;
+  }
+  if (p[0] === "PRUEBA" || p[0] === "PRUEBA_OK") {
     const i = +p[1] - 1, nom = i >= 0 && i < N ? `Servo ${i + 1} (${cal.granos[i]})` : "Servo";
-    const txt = { PRUEBA: `${nom}: girando ${p[2]} vuelta${+p[2] > 1 ? "s" : ""}…`, PRUEBA_OK: VT.ultK === 1 ? `${nom}: terminó. ¿Dio la vuelta exacta? Si se pasó, baja el tiempo; si le faltó, súbelo.` : `${nom}: terminó el dispensado de prueba.`,
-      AJUSTE_OK: `${nom}: listo.`, HOME_OK: `${nom}: en inicio.`, HOME_FIJO: `${nom}: inicio guardado.` }[p[0]];
+    const txt = p[0] === "PRUEBA" ? `${nom}: abriendo y cerrando ${p[2]} ${+p[2] > 1 ? "veces" : "vez"}…` : `${nom}: terminó la porción de prueba. ¿Cayó lo que querías? Si no, cambia el tiempo o las veces.`;
+    if (i >= 0 && i < N && p[0] === "PRUEBA_OK") { VT.ang[i] = VT.c[i]; pintarVueltas(true); }
     log(txt); vtAviso(txt); return true;
   }
   return false;
@@ -3444,7 +3538,7 @@ function reanudarPedido() { enviarComando("A", "Reanudar pedido"); }
 /* ---------- servos: Gira / Para ---------- */
 function girarServo(i, on) {
   if (!verificarConexion()) return;
-  enviarComando(`G,${i + 1},${on ? 1 : 0}`, `Servo ${i + 1} (${cal.granos[i]}): ${on ? "GIRA" : "PARA"}`);
+  enviarComando(`G,${i + 1},${on ? 1 : 0}`, `Servo ${i + 1} (${cal.granos[i]}): ${on ? "ABRIR" : "CERRAR"} compuerta`);
 }
 
 /* ---------- calibración de sensores ---------- */
