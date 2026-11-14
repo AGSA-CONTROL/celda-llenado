@@ -83,6 +83,24 @@ input:focus,select:focus{border-color:var(--yellow);outline:none}
 #lblUserRole{font-size:11px;font-weight:700;text-align:right;letter-spacing:.5px}
 .estop{background:linear-gradient(180deg,#ee4f54,#cf3238);color:#fff;border:3px solid #7a1c1f;border-radius:12px;font-weight:800;font-size:15px;letter-spacing:.5px;min-height:52px;padding:6px 18px;box-shadow:0 4px 16px rgba(229,72,77,.3)}
 .estop:hover{filter:brightness(1.1)}
+/* ===== VOZ: botón y panel para activar / desactivar los audios ===== */
+#chipVoz{cursor:pointer;position:relative}
+#chipVoz.ok{color:var(--text)}
+#chipVoz.off{opacity:.7}
+#chipVoz.habla{border-color:var(--green);box-shadow:0 0 0 2px rgba(51,196,105,.25)}
+#vozPanel{position:fixed;z-index:9000;top:64px;right:18px;width:360px;max-width:calc(100vw - 24px);background:var(--panel);border:1px solid var(--border);border-top:3px solid var(--yellow);border-radius:12px;padding:14px 16px;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+#vozPanel[hidden]{display:none}
+#vozPanel h4{margin:0 0 10px;font-size:14px;letter-spacing:1px}
+#vozPanel .vozFila{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border)}
+#vozPanel .vozFila label{flex:1;display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px}
+#vozPanel .vozFila small{display:block;color:var(--muted);font-size:11px}
+#vozPanel .vozFila button{padding:4px 10px;font-size:12px}
+#vozPanel .vozMaestro{display:flex;align-items:center;gap:10px;font-weight:700;margin-bottom:8px}
+#vozPanel .vozVol{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:6px}
+#vozPanel .vozVol input{flex:1}
+#vozPanel .vozAhora{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px}
+#vozPanel input[type=checkbox]{width:18px;height:18px;margin:0;accent-color:var(--green)}
+
 .estop.rearm{background:linear-gradient(180deg,#ffb544,var(--yellow));color:#181305;border-color:#7a5510;box-shadow:0 4px 16px rgba(245,166,35,.3)}
 
 #body{display:grid;grid-template-columns:256px 1fr;min-height:0}
@@ -905,12 +923,14 @@ window.ALM_PEDIDO = {};
     <span class="chip" id="chipDisp"><i></i>DISPENSADO</span>
     <span class="chip" id="chipAgv"><i></i>AGV</span>
     <button type="button" class="chip chipModo" id="chipModo" title="Cambiar modo de trabajo">MODO SIMULADOR</button>
+    <button type="button" class="chip" id="chipVoz" title="Activar o desactivar la voz" aria-expanded="false" aria-controls="vozPanel">🔊 VOZ</button>
     <div><div id="lblClockTime">--:--:--</div><div id="lblClockDate">&nbsp;</div></div>
     <div><div id="lblUserName">—</div><div id="lblUserRole">—</div></div>
     <button id="btnLogout" class="btn sm" type="button">Cerrar sesión</button>
     <button id="btnEstop" class="estop" type="button">⛔ PARO DE EMERGENCIA</button>
   </header>
 
+  <div id="vozPanel" hidden role="dialog" aria-label="Voz del HMI"></div>
   <div id="body">
     <nav id="sidebar" aria-label="Navegación">
       <button class="nav" data-view="viewGinebra" data-role="1"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="6" r="1.6" fill="currentColor"/><circle cx="12" cy="18" r="1.6" fill="currentColor"/></svg><span>Rueda de Ginebra</span></button>
@@ -2184,12 +2204,126 @@ function qcDeFrame(d, p){
     q.s3 = false;
   }
 }
+/* ======================================================================
+   VOZ DEL HMI · audios de la carpeta /audio/ (solo suenan en este HMI)
+   - Un solo elemento Audio reutilizado, desbloqueado en el clic de "Iniciar sesión".
+   - Cola: dos audios nunca se enciman; cada evento suena una sola vez, sin bucle.
+   - Se activa / desactiva con el botón "🔊 VOZ" de la barra de arriba (se recuerda).
+   Disparadores (iguales en modo Físico y Simulador, porque los dos mandan la
+   misma trama GIN y los mismos eventos del carro):
+     presentacion  -> pulso "home" de la trama GIN (la rueda llegó a home)
+     envases       -> lote en curso y F0 (rampa) sin envase 3 s seguidos (una vez hasta que F0 vuelva a detectar)
+     agvSale       -> evento "salio" del carro (sale a entregar)
+     agvCarga      -> evento "en_carga" del carro (regresó a la posición de carga)
+     calidad       -> termina un lote con al menos un vaso rechazado en Verificación
+   ====================================================================== */
+const VOZ = (() => {
+  const AUD = {
+    presentacion: { f:"audio/Voz_de_presentacion.mp3",          n:"Presentación",            c:"La rueda llega a home" },
+    envases:      { f:"audio/Voz_de_embases_en_produccion.mp3", n:"Envases en producción",   c:"Lote en curso y la rampa F0 sin envase 3 s" },
+    agvSale:      { f:"audio/Voz_AGV_en_desplazamiento.mp3",    n:"AGV en desplazamiento",   c:"El carro sale a entregar el lote" },
+    agvCarga:     { f:"audio/Voz_AGV_esperando_producto.mp3",   n:"AGV esperando producto",  c:"El carro regresa a la posición de carga" },
+    calidad:      { f:"audio/Voz_control_de_calidad.mp3",       n:"Control de calidad",      c:"Termina un lote con algún vaso rechazado" }
+  };
+  const KEY = "hmi01_voz";
+  const cfg = { on:true, vol:1, apagadas:{} };
+  try{ Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || "{}")); }catch(_){}
+  if(!cfg.apagadas || typeof cfg.apagadas !== "object") cfg.apagadas = {};
+  const el = new Audio(); el.preload = "auto";
+  const cola = []; const historial = [];
+  let listo = false, sonando = null;
+  const guardar = () => { try{ localStorage.setItem(KEY, JSON.stringify(cfg)); }catch(_){} };
+
+  function siguiente(){
+    if(sonando || !listo || !cola.length) return;
+    const k = cola.shift();
+    sonando = k; el.muted = false; el.loop = false; el.volume = cfg.vol; el.src = AUD[k].f;
+    const p = el.play();
+    if(p && p.catch) p.catch(() => { sonando = null; pintar(); setTimeout(siguiente, 60); });
+    pintar();
+  }
+  el.addEventListener("ended", () => { sonando = null; pintar(); siguiente(); });
+  el.addEventListener("error", () => { if(!sonando) return; sonando = null; pintar(); siguiente(); });
+
+  /* pide un audio: entra a la cola (si no está ya en la cola o sonando) */
+  function decir(k, forzar){
+    if(!AUD[k]) return false;
+    if(!forzar && (!cfg.on || cfg.apagadas[k])) return false;
+    if(sonando === k || cola.includes(k)) return false;
+    cola.push(k); historial.push({ k, t:Date.now() });
+    if(historial.length > 50) historial.shift();
+    siguiente(); return true;
+  }
+  function callar(){ cola.length = 0; if(sonando){ sonando = null; try{ el.pause(); }catch(_){} } pintar(); }
+  /* el navegador bloquea el audio hasta que el usuario hace clic: se desbloquea con el clic de iniciar sesión */
+  function desbloquear(){
+    if(listo) return;
+    el.muted = true; el.src = AUD.agvSale.f;
+    const fin = () => { try{ el.pause(); el.currentTime = 0; }catch(_){} el.muted = false; listo = true; siguiente(); };
+    let p; try{ p = el.play(); }catch(_){ p = null; }
+    if(p && p.then) p.then(fin).catch(fin); else fin();
+  }
+
+  /* ---- botón y panel ---- */
+  function pintar(){
+    const b = document.getElementById("chipVoz"); if(!b) return;
+    b.textContent = cfg.on ? "🔊 VOZ" : "🔇 VOZ";
+    b.classList.toggle("ok", cfg.on); b.classList.toggle("off", !cfg.on); b.classList.toggle("habla", !!sonando);
+    const ah = document.getElementById("vozAhora");
+    if(ah) ah.textContent = sonando ? "▶ Sonando: " + AUD[sonando].n + (cola.length ? " · en espera: " + cola.map(k => AUD[k].n).join(", ") : "") : (cfg.on ? "En silencio." : "La voz está desactivada.");
+  }
+  function armarPanel(){
+    const p = document.getElementById("vozPanel"); if(!p) return;
+    p.innerHTML = `<h4>VOZ DEL HMI</h4>
+      <label class="vozMaestro"><input type="checkbox" id="vozOn"> Voz activada</label>
+      <div class="vozVol">Volumen <input type="range" id="vozVol" min="0" max="1" step="0.05"></div>
+      ${Object.entries(AUD).map(([k, a]) => `<div class="vozFila"><label><input type="checkbox" data-voz="${k}"><span>${a.n}<small>${a.c}</small></span></label><button type="button" class="btn sm" data-probar="${k}">▶ Probar</button></div>`).join("")}
+      <div class="vozFila"><span style="flex:1"></span><button type="button" class="btn sm" id="vozCallar">■ Callar</button></div>
+      <div class="vozAhora" id="vozAhora"></div>`;
+    const on = p.querySelector("#vozOn"); on.checked = cfg.on;
+    on.onchange = () => { cfg.on = on.checked; guardar(); if(!cfg.on) callar(); pintar(); };
+    const vol = p.querySelector("#vozVol"); vol.value = cfg.vol;
+    vol.oninput = () => { cfg.vol = Number(vol.value); el.volume = cfg.vol; guardar(); };
+    p.querySelectorAll("[data-voz]").forEach(c => { c.checked = !cfg.apagadas[c.dataset.voz]; c.onchange = () => { if(c.checked) delete cfg.apagadas[c.dataset.voz]; else cfg.apagadas[c.dataset.voz] = true; guardar(); }; });
+    p.querySelectorAll("[data-probar]").forEach(b => b.onclick = () => { desbloquear(); decir(b.dataset.probar, true); });
+    p.querySelector("#vozCallar").onclick = callar;
+    pintar();
+  }
+  function iniciar(){
+    const b = document.getElementById("chipVoz"), p = document.getElementById("vozPanel");
+    if(!b || !p) return;
+    armarPanel();
+    b.onclick = (e) => { e.stopPropagation(); desbloquear(); p.hidden = !p.hidden; b.setAttribute("aria-expanded", String(!p.hidden)); if(!p.hidden){ const r = b.getBoundingClientRect(); p.style.top = (r.bottom + 8) + "px"; p.style.right = Math.max(12, innerWidth - r.right) + "px"; } };
+    document.addEventListener("click", e => { if(!p.hidden && !p.contains(e.target) && e.target !== b){ p.hidden = true; b.setAttribute("aria-expanded", "false"); } });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
+  return { decir, callar, desbloquear, estado: () => ({ on:cfg.on, listo, sonando, cola:cola.slice(), historial:historial.slice() }) };
+})();
+
+/* F0 sin envase durante un lote: cuenta el tiempo con las tramas GIN */
+const VOZ_F0 = { desde:0, avisado:false };
+function vozDeGIN(d, p, primera){
+  /* 1) la rueda llegó a home: pulso "home" (0 -> 1) */
+  const homeAntes = primera ? 0 : (Number(p.home) || 0);
+  if(Number(d.home) === 1 && homeAntes !== 1) VOZ.decir("presentacion");
+  /* 2) lote en curso y la rampa F0 sin envase 3 s seguidos (una sola vez hasta que F0 vuelva a detectar) */
+  const f0 = d.sens && d.sens[0] === "1";
+  const lote = window.DISP && DISP.loteActivo ? DISP.loteActivo() : null;
+  if(f0){ VOZ_F0.desde = 0; VOZ_F0.avisado = false; }
+  else if(lote){
+    const now = Date.now();
+    if(!VOZ_F0.desde) VOZ_F0.desde = now;
+    else if(!VOZ_F0.avisado && now - VOZ_F0.desde >= 3000){ VOZ_F0.avisado = true; VOZ.decir("envases"); }
+  } else VOZ_F0.desde = 0;
+}
+
 function onGIN(d){
   const p = H.gin, primera = !H.ginVisto;
   if(window.DISP && !CTL.gin.e2Firmware){
     const e2 = d.sens[1] === "1" ? "E2,1" : "E2,0";
     if(primera || d.sens[1] !== p.sens[1] || !DISP.estado().e2Listo) e2DeRueda(e2);
   }
+  try{ vozDeGIN(d, p, primera); }catch(_){}               // VOZ: home y rampa F0
   H.gin = d; H.ginVisto = true;
   if(window.DISP) DISP.ginTick(d);                        // ¿ya puede salir el carro? (el tapado terminó)
   if(!H.granoHueco) H.granoHueco = {};
@@ -2254,6 +2388,7 @@ function showView(id){
 function login(user, pw){
   const u = USERS[(user || "").trim().toLowerCase()];
   if(!u || u.pass !== pw){ $("#lblLoginError").textContent = "Usuario o contraseña incorrectos."; return false; }
+  VOZ.desbloquear();                                     // VOZ: el clic de iniciar sesión desbloquea el audio
   H.session = {user, ...u};
   $("#lblUserName").textContent = u.name;
   $("#lblUserRole").textContent = u.roleName; $("#lblUserRole").style.color = u.color;
@@ -3075,6 +3210,7 @@ const AGV = (() => {
       const lote = m.lote || null, d = m.almacen;
       switch(m.ev){
         case "salio":
+          VOZ.decir("agvSale");              // VOZ: el carro sale a entregar
           log(`🚚 El carro salió con el lote ${lote ? lote.n : ""} (${st.vasos.length} vaso${st.vasos.length === 1 ? "" : "s"}).`);
           tienda(lote, "entrega", { etapa:"cargado", msg:"¡Lote completo y verificado! El carro AGV sale a entregarlo." }); break;
         case "qr": {                         // el carro real lee un QR en CADA estación (de paso, destino o HOME)
@@ -3092,6 +3228,7 @@ const AGV = (() => {
         case "entregado":
           log(`🚚 Descarga terminada en el Almacén ${d}: el carro regresa a carga.`); break;
         case "en_carga":
+          VOZ.decir("agvCarga");             // VOZ: el carro espera el siguiente producto
           log("🚚 El carro regresó a la posición de carga. Ya puede empezar el siguiente lote.");
           st.estado = "CARGA"; renderTodo(); if(window.DISP) DISP.pump(); break;
         case "sin_destino":
@@ -4260,6 +4397,7 @@ function ginTick(d) {
 }
 function terminarLote(completo) {
   const a = LV.activo; if (!a) return;
+  if (a.rech > 0 && typeof VOZ !== "undefined") VOZ.decir("calidad");   // VOZ: hubo vasos rechazados en Verificación
   LV.activo = null;
   if (completo && window.AGV && window.AGV.habilitado()) {
     avisar(`✔ Lote completo y verificado: ${resumenLote(a.p)}` + (a.rech ? ` (${a.rech} vaso${a.rech > 1 ? "s" : ""} repuesto${a.rech > 1 ? "s" : ""})` : "") + ". El carro sale cuando el último vaso caiga.");

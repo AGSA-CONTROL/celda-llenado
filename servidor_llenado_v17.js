@@ -12,10 +12,32 @@ const NUBE = process.env.RENDER_EXTERNAL_URL || "";
    Se activa con:  set PUENTE_NUBE=wss://celda-llenado.onrender.com   (lo hace INICIAR_PUENTE_CARRO.bat) */
 const PUENTE_NUBE = NUBE ? "" : (process.env.PUENTE_NUBE || "");     // en Render (la nube) trae el link fijo, ej. https://celda-llenado.onrender.com
 
+/* ---------- audios (.mp3) de la carpeta audio/, con soporte de "Range" para el navegador ---------- */
+function servirAudio(req, res, nombre) {
+  if (!/^[\w.-]+\.mp3$/i.test(nombre)) { res.writeHead(404); return res.end("No encontrado"); }
+  const ruta = path.join(DIR, "audio", nombre);
+  fs.stat(ruta, (e, st) => {
+    if (e || !st.isFile()) { res.writeHead(404); return res.end("No encontrado"); }
+    const base = { "Content-Type": "audio/mpeg", "Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600" };
+    const r = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || "");
+    if (r && (r[1] || r[2])) {
+      let ini = r[1] ? Number(r[1]) : Math.max(0, st.size - Number(r[2]));
+      let fin = r[1] && r[2] ? Math.min(Number(r[2]), st.size - 1) : st.size - 1;
+      if (ini > fin || ini >= st.size) { res.writeHead(416, { "Content-Range": "bytes */" + st.size }); return res.end(); }
+      res.writeHead(206, { ...base, "Content-Range": `bytes ${ini}-${fin}/${st.size}`, "Content-Length": fin - ini + 1 });
+      return fs.createReadStream(ruta, { start: ini, end: fin }).pipe(res);
+    }
+    res.writeHead(200, { ...base, "Content-Length": st.size });
+    fs.createReadStream(ruta).pipe(res);
+  });
+}
+
 /* ---------- archivos .html ---------- */
 const server = http.createServer((req, res) => {
   let nombre = "";
   try { nombre = path.basename(decodeURIComponent((req.url || "/").split("?")[0])); } catch (_) {}
+  /* audios del HMI: /audio/<nombre>.mp3 (solo archivos .mp3 de la carpeta audio/) */
+  if (/^\/audio\//.test(req.url || "")) return servirAudio(req, res, nombre);
   if (nombre === "") {
     const lista = fs.readdirSync(DIR).filter(f => f.endsWith(".html")).map(f => `<li><a href="/${f}">${f}</a></li>`).join("");
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
