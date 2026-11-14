@@ -787,6 +787,9 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
 .simRechBtns .btn{min-height:40px;padding:4px 6px;font-size:14px;border-left:4px solid var(--c,var(--border2))}
 .simRechPend{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
 .simRechPend.on{color:var(--red);font-weight:700}
+.simRechMsg{margin-top:6px;font-size:13px;line-height:1.35;color:var(--muted);min-height:0}
+.simRechMsg.ok{color:var(--green);font-weight:700}
+.simRechMsg.warn{color:var(--yellow);font-weight:700}
 .lnk{background:none;border:0;color:var(--yellow);text-decoration:underline;font-size:13px;padding:0}
 #chipAgv{white-space:nowrap}
 #chipAgv[data-modo]::after{content:attr(data-modo);margin-left:6px;padding:1px 5px;border-radius:4px;font-size:10px;letter-spacing:.04em;background:rgba(255,255,255,.12);color:var(--text)}
@@ -990,22 +993,24 @@ window.ALM_PEDIDO = {};
           <div class="ginSide">
             <section class="grp cQC">
               <h3>Control de calidad</h3>
+              <div class="simRechBox" id="simRechBox" hidden>
+                <div class="simRechT">Prueba de rechazo <span>· simulador</span></div>
+                <p><b>1.</b> Toca el grano del vaso que quieres que Verificación rechace. <b>2.</b> Pulsa <b>Hacer prueba ahora</b>: se sirve un lote de prueba (Frijol, Lentejas y Maíz), ese vaso sale sin tapa, se rechaza y el dispensador lo vuelve a servir.</p>
+                <div class="simRechBtns">
+                  <button class="btn sm" type="button" data-rech="1">Frijol</button>
+                  <button class="btn sm" type="button" data-rech="2">Lentejas</button>
+                  <button class="btn sm" type="button" data-rech="3">Maíz</button>
+                </div>
+                <button class="btn yellow" id="simRechProbar" type="button" style="width:100%;margin-top:8px">▶ Hacer prueba ahora</button>
+                <div class="simRechPend"><span id="simRechPend">Sin rechazos pendientes</span><button class="lnk" id="simRechCancel" type="button" hidden>Cancelar</button></div>
+                <div class="simRechMsg" id="simRechMsg" aria-live="polite"></div>
+              </div>
               <div class="status" id="ccIcono">—</div>
               <div class="tag miniTxt" id="ccTxt">Sin verificaciones todavía</div>
               <div class="lamps"><span class="lamp" id="lampOk"></span><span class="lampTxt">BUENO</span><span class="lamp" id="lampRej" style="margin-left:18px"></span><span class="lampTxt">RECHAZO</span></div>
               <div class="tag miniTxt" id="ccCont">Buenos: 0 · Rechazados: 0</div>
               <div class="tag miniTxt dim" id="ccDiag">Diagnóstico E3: sin datos</div>
               <button class="btn sm" id="btnResetRech" type="button" style="margin-top:10px;width:100%">Reiniciar contadores</button>
-              <div class="simRechBox" id="simRechBox" hidden>
-                <div class="simRechT">Prueba de rechazo <span>· simulador</span></div>
-                <p>Toca un grano: su próximo vaso saldrá sin tapa, Verificación lo rechaza y el dispensador lo vuelve a servir hasta completar el lote.</p>
-                <div class="simRechBtns">
-                  <button class="btn sm" type="button" data-rech="1">Frijol</button>
-                  <button class="btn sm" type="button" data-rech="2">Lentejas</button>
-                  <button class="btn sm" type="button" data-rech="3">Maíz</button>
-                </div>
-                <div class="simRechPend"><span id="simRechPend">Sin rechazos pendientes</span><button class="lnk" id="simRechCancel" type="button" hidden>Cancelar</button></div>
-              </div>
             </section>
             <section class="grp span2 cOk">
               <h3>Confirmaciones por estación</h3>
@@ -3351,6 +3356,34 @@ window.AGV = AGV;
     toast(`El próximo vaso de ${nomGrano(i)} será rechazado en Verificación.`);
   }));
   $("#simRechCancel").addEventListener("click", () => { const s = simRueda(); if(s) s.rechGrano = [0, 0, 0, 0]; pintarRech(); });
+  const rechMsg = (t, c) => { const m = $("#simRechMsg"); m.textContent = t; m.className = "simRechMsg" + (c ? " " + c : ""); };
+  let rechAntes = null, rechTot = null, rechEspera = false;
+  const totRech = () => (H.tot && Number(H.tot.rech)) || 0;
+  /* sigue el vaso marcado: sale sin tapa en Tapado y luego Verificación lo rechaza */
+  setInterval(() => {
+    const s = simRueda(); if(!s) return;
+    const n = (s.rechGrano || []).reduce((a, b) => a + b, 0);
+    if(rechAntes !== null && n < rechAntes){ rechEspera = true; rechTot = totRech(); rechMsg("El vaso marcado salió de Tapado SIN tapa. Va a Verificación…", "warn"); pintarRech(); }
+    if(rechEspera && totRech() > rechTot){ rechEspera = false; rechMsg("✔ Verificación RECHAZÓ el vaso (no tenía tapa). Se manda a merma y el dispensador lo vuelve a servir para completar el lote.", "ok"); }
+    rechAntes = n;
+  }, 300);
+  $("#simRechProbar").addEventListener("click", () => {
+    const s = simRueda();
+    if(!s){ rechMsg("La rueda simulada no está conectada. Entra en modo Simulador.", "warn"); return; }
+    if(!(s.rechGrano || []).some(x => x > 0)){ s.rechGrano[1]++; s.alRechGrano = pintarRech; }   // si no eligió, se rechaza el Frijol
+    rechAntes = s.rechGrano.reduce((a, b) => a + b, 0);
+    pintarRech();
+    if(H.estop){ rechMsg("El paro de emergencia está activo: pulsa REARMAR SISTEMA y vuelve a intentar.", "warn"); return; }
+    if(!window.DISP){ rechMsg("El dispensador no está disponible.", "warn"); return; }
+    if(DISP.loteActivo()){ rechMsg("Ya hay un lote corriendo: el rechazo se hace en ese lote cuando el vaso marcado pase por Verificación.", "ok"); return; }
+    if(window.AGV && AGV.habilitado() && !AGV.puedeCargar()){
+      rechMsg("El carro AGV no está en la posición de carga (o su página no está abierta), y sin él la rueda no empieza un lote. Abre la página del carro en esta misma sala (modo Simulador) o desactiva el carro en la pestaña AGV. El rechazo queda pendiente.", "warn"); return;
+    }
+    const r = DISP.pedidoPrueba([1, 1, 1]);
+    if(r === "ok") rechMsg("🧪 Lote de prueba en marcha. Mira la estación de Verificación: el vaso marcado sale sin tapa y se rechaza.", "ok");
+    else if(r === "ocupado") rechMsg("El dispensador todavía tiene un lote en la fila: el rechazo se hará en ese lote.", "ok");
+    else rechMsg("El dispensador no está listo todavía. Espera un momento y vuelve a intentar.", "warn");
+  });
   pintarRech();
   $("#simRellenar").addEventListener("click", () => { const t = CTL.disp.transporte; if(t && t.esSim){ t.sim.rellenar(); toast("Tolvas rellenadas."); } });
   $("#simIniciar").addEventListener("click", () => { $("#btnModoAuto").click(); toast("Rueda en automático."); });
@@ -4494,6 +4527,14 @@ return {
   servidor: (o) => enviarServidor(o),
   tienda: (id, f, x) => tiendaEstado(id, f, x),
   loteActivo: () => LV.activo,
+  /* lote de prueba hecho desde el HMI (sin tienda): entra a la cola como cualquier lote */
+  pedidoPrueba: (p) => {
+    if (LV.activo || st.armado || st.enviando || cola.length) return "ocupado";
+    if (!(link && st.listo && !st.emergencia)) return "no_listo";
+    const l = p.slice(); cola.push(l);
+    log(`🧪 Lote de prueba de rechazo: ${resumenLote(l)}.`);
+    pumpCola(); render(); return "ok";
+  },
   calTolvas: () => cal.tolvas,
   log: (m) => log(m),
   verif: (l) => verif(l),
