@@ -192,7 +192,7 @@ void reportarSensores() {
 
 // ===================== SERVOS DE 180° =====================
 void moverServo(uint8_t s, uint8_t g) {         // va al ángulo g y se queda ahí (sostiene la posición)
-  if (!servos[s].attached()) servos[s].attach(SERVO_PIN[s], 500, 2400);
+  if (!servos[s].attached()) servos[s].attach(SERVO_PIN[s]);   // igual que el código de prueba: write(0) = cerrado
   servos[s].write(g);
 }
 void abrirServo(uint8_t s)  { moverServo(s, angAbierto[s]); }
