@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGV-01 · Carro de entrega</title>
+<style>
+:root{
+  --bg:#0c0f14; --panel:#161b23; --panel2:#202733; --inset:#0b0e12; --border:#2c3544; --border2:#3b4659;
+  --text:#eef2f7; --muted:#98a3b3; --dim:#5f6b7c;
+  --yellow:#f5a623; --green:#33c469; --red:#e5484d; --blue:#3aafd9;
+  --radius:12px;
+  --mono:Consolas,"SF Mono",Menlo,"Liberation Mono",monospace;
+  --sans:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;display:flex;flex-direction:column}
+button,input,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+
+/* barra superior */
+#top{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.marca{display:flex;align-items:center;gap:10px}
+.marca svg{width:34px;height:34px;color:var(--yellow)}
+.marca b{display:block;font-size:20px;font-weight:800;letter-spacing:.5px}
+.marca small{display:block;font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:1.5px}
+.tabs{display:flex;gap:6px;margin-left:10px}
+.tab{padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:var(--inset);color:var(--muted);font-weight:700;cursor:pointer}
+.tab.on{background:rgba(245,166,35,.14);border-color:var(--yellow);color:var(--yellow)}
+.spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;border:1px solid var(--border2);font-size:12px;font-weight:700;letter-spacing:1px;color:var(--muted);background:var(--inset);white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--red)}
+.chip.ok{color:var(--text)} .chip.ok i{background:var(--green);box-shadow:0 0 8px var(--green)}
+.chipModo{cursor:pointer;background:repeating-linear-gradient(135deg,#f5a623 0 10px,#d48a0f 10px 20px);color:#1b1204;border:0;font-weight:800}
+.chipModo.fisico{background:var(--panel2);color:var(--text);border:1px solid var(--border2)}
+#reloj{font-family:var(--mono);font-size:18px;font-weight:700}
+.paro{padding:10px 18px;border-radius:10px;border:0;background:var(--red);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 0 16px rgba(229,72,77,.45)}
+.paro.cont{background:var(--green);color:#06210f;box-shadow:none}
+.btnAvanzar{flex:1;padding:16px 10px;border-radius:12px;border:0;background:var(--green);color:#06210f;font-weight:900;font-size:17px;cursor:pointer}
+.btnAvanzar:disabled{background:var(--inset);color:var(--muted);cursor:not-allowed}
+.btnParo2{flex:1;padding:16px 10px;font-size:17px}
+.lugar{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--inset);font-size:14px}
+.lugar b{color:var(--yellow)}
+.qrLeyenda{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.qrLeyenda b{color:var(--text,#e6e9ef)}
+.notaCtl.mal{color:var(--red);font-weight:700}
+
+main{flex:1;min-height:0;overflow:auto;padding:16px 18px}
+h2{margin:0 0 4px;font-size:24px}
+.sub{margin:0 0 14px;color:var(--muted);max-width:110ch;line-height:1.45}
+.grp{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.grp h3{margin:0 0 12px;font-size:12px;letter-spacing:1.6px;color:var(--muted);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.grp h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--yellow)}
+.btn{padding:11px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--panel2);font-weight:700;cursor:pointer}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.red{background:var(--red);border-color:var(--red);color:#fff}
+.btn.yellow{background:var(--yellow);border-color:var(--yellow);color:#1b1204}
+.row{display:flex;gap:8px;flex-wrap:wrap} .row .btn{flex:1}
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label{font-size:11px;letter-spacing:1.4px;color:var(--muted);font-weight:700;text-transform:uppercase}
+select,input[type=text]{background:var(--inset);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;min-width:0}
+input[type=range]{width:100%;accent-color:var(--blue)}
+.nota{font-size:13px;color:var(--muted);line-height:1.45;margin:0}
+
+/* vista del carro */
+.carroGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,380px);gap:16px;align-items:start}
+.mapa{padding:12px}
+#svg{width:100%;height:auto;display:block;max-height:calc(100vh - 190px)}
+.lado{display:flex;flex-direction:column;gap:12px}
+.estado{font-size:20px;font-weight:800;padding:14px 16px;border-radius:10px;background:var(--inset);border:1px solid var(--border);border-left:5px solid var(--dim);line-height:1.2}
+.estado small{display:block;font-size:13px;font-weight:500;color:var(--muted);margin-top:4px}
+.estado.carga{border-left-color:var(--green)} .estado.carga b{color:var(--green)}
+.estado.ruta{border-left-color:var(--yellow)} .estado.ruta b{color:var(--yellow)}
+.estado.paro{border-left-color:var(--red)} .estado.paro b{color:var(--red)}
+.tag{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px}
+.vasos{display:flex;gap:10px;align-items:flex-end;margin-top:6px}
+.vasos span{width:34px;height:44px;clip-path:polygon(8% 0,92% 0,80% 100%,20% 100%);background:var(--inset);box-shadow:inset 0 0 0 2px var(--border2)}
+.vasos span.lleno{background:var(--c)}
+.qr{display:flex;gap:14px;align-items:center}
+.qr svg{width:104px;height:104px;flex:none;background:#fff;border-radius:6px;padding:6px}
+.qr b{display:block;font-size:22px;color:var(--yellow)}
+.qr small{display:block;color:var(--muted);font-size:13px}
+.cuenta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.cuenta div{background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:8px 4px}
+.cuenta b{display:block;font-size:22px;font-family:var(--mono)}
+.cuenta small{color:var(--muted);font-size:11px}
+.cuenta .piso b{color:var(--red)}
+.ctl{display:grid;gap:12px}
+#registro{list-style:none;margin:0;padding:0;max-height:220px;overflow:auto;font-size:13px}
+#registro li{padding:5px 0;border-bottom:1px solid #1d242f;color:var(--muted)}
+#registro li b{font-family:var(--mono);color:var(--dim);font-weight:500;margin-right:8px}
+#svg .alm rect.edif{fill:#1d2530;stroke:#3b4659;stroke-width:2}
+#svg .alm.dest rect.edif{stroke:var(--yellow);stroke-width:3}
+#svg .alm.bajando rect.edif{fill:#2a2412;stroke-width:4}
+#svg .alm.dest .tit{fill:var(--yellow)}
+#svg .alm .tit{fill:var(--text);font:700 16px var(--sans)}
+#svg .alm .num{fill:var(--muted);font:600 12px var(--mono)}
+/* v17: almacén elegido, QR de cada estación */
+#svg .alm.prox rect.edif{stroke:var(--yellow);stroke-width:2.5;stroke-dasharray:8 6}
+#svg .alm.prox .tit{fill:var(--yellow)}
+#svg .qrE rect.fondo{fill:#fff}
+#svg .qrE text{fill:#98a3b3;font:700 11px var(--mono)}
+#svg .qrE.leido rect.fondo{fill:#f5a623}
+#svg .qrE.leido text{fill:#f5a623}
+.destBtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.destBtns.pide button{animation:pide 1s ease-in-out infinite}
+@keyframes pide{50%{border-color:var(--yellow);box-shadow:0 0 14px rgba(245,166,35,.55)}}
+.destBtns button{padding:12px 4px;border-radius:10px;border:2px solid var(--border2);background:var(--inset);font-weight:800;font-size:15px;cursor:pointer;line-height:1.15}
+.destBtns button small{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:3px}
+.destBtns button.on{border-color:var(--yellow);background:rgba(245,166,35,.14);color:var(--yellow)}
+#svg .parada line{stroke:#c9d1db;stroke-width:3}
+#svg .sens{fill:#3b4659}
+#svg .sens.on{fill:#ff4d4d}
+
+/* comunicación */
+.commGrid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));align-items:start}
+.wide{grid-column:1/-1}
+.cardHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.cardHead h3{margin:0}
+.pill{font-size:11px;font-weight:800;letter-spacing:1px;padding:5px 10px;border-radius:999px;border:1px solid var(--border2);color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--red)}
+.pill.ok{color:var(--green);border-color:rgba(51,196,105,.45)} .pill.ok::before{background:var(--green)}
+.modoBtns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modoBtn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:12px 14px;border-radius:10px;background:var(--inset);border:2px solid var(--border);cursor:pointer}
+.modoBtn b{font-size:17px} .modoBtn small{font-size:12px;color:var(--muted);line-height:1.3}
+.modoBtn.on{border-color:var(--yellow);background:rgba(245,166,35,.12)} .modoBtn.on b{color:var(--yellow)}
+.connRow{display:grid;grid-template-columns:1fr 140px auto;gap:10px;align-items:end}
+.ultima{font-family:var(--mono);font-size:13px;color:var(--muted);background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:9px 12px;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+pre.log{margin:10px 0 0;font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:220px;overflow:auto;white-space:pre-wrap}
+pre.proto{max-height:none}
+
+#pie{background:var(--panel);border-top:1px solid var(--border);font-family:var(--mono);font-size:13px;color:var(--muted);padding:8px 18px}
+#toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--border2);padding:12px 18px;border-radius:10px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw}
+#toast.on{opacity:1}
+@media (max-width:1100px){.carroGrid{grid-template-columns:1fr}.connRow{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+.pasos{margin:0;padding-left:20px;line-height:1.55;font-size:14px}
+.pasos li{margin-bottom:4px}
+.pasos code{font-family:var(--mono);background:var(--inset);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+.kvs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kvs div{background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:8px 10px;min-width:0}
+.kvs small{display:block;color:var(--muted);font-size:11px;margin-bottom:2px}
+.kvs b{font-family:var(--mono);font-size:14px;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="marca">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="9" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="7.5" cy="18.5" r="1.8" fill="currentColor"/><circle cx="16.5" cy="18.5" r="1.8" fill="currentColor"/><path d="M8 8V5.5h8V8" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <div><b>AGV-01</b><small id="marcaSub">CARRO DE ENTREGA</small></div>
+  </div>
+  <nav class="tabs" aria-label="Vistas">
+    <button class="tab on" type="button" data-v="vCarro">Carro</button>
+    <button class="tab" type="button" data-v="vComm">Comunicación</button>
+  </nav>
+  <div class="spacer"></div>
+  <span class="chip" id="chipSrv"><i></i>SERVIDOR</span>
+  <span class="chip" id="chipHmi"><i></i>HMI</span>
+  <span class="chip" id="chipEsp"><i></i>CARRO ESP32</span>
+  <button type="button" class="chip chipModo" id="chipModo" title="Cambiar modo de trabajo">MODO</button>
+  <div id="reloj">--:--:--</div>
+  <button type="button" class="paro" id="btnParo">⛔ DETENER CARRO</button>
+</header>
+
+<main>
+  <!-- ===================== CARRO ===================== -->
+  <section id="vCarro">
+    <h2>Carro AGV · entrega a almacenes</h2>
+    <p class="sub">Seguidor de línea. Espera en la posición de carga mientras la rueda arma el lote; los vasos aprobados caen al carro. Con el lote completo sale y se detiene en cada estación a leer su QR; descarga en el almacén que elegiste y regresa por la línea a la posición de carga.</p>
+    <div class="carroGrid">
+      <section class="grp mapa"><svg id="svg" viewBox="0 0 1000 600" role="img" aria-label="Circuito del carro con la posición de carga, el lector QR y los tres almacenes"></svg></section>
+      <div class="lado">
+        <section class="grp">
+          <h3>Estado del carro</h3>
+          <div class="estado" id="estado"><b>—</b><small></small></div>
+          <div class="lugar" id="lugar">Último QR leído: <b>—</b></div>
+          <div class="tag">Vasos en el carro</div>
+          <div class="vasos" id="vasos"><span></span><span></span><span></span></div>
+        </section>
+        <section class="grp">
+          <h3>Destino del lote</h3>
+          <div class="qr"><svg id="qr" viewBox="0 0 25 25" aria-label="Código QR del lote"></svg>
+            <div><b id="destTxt">—</b><small id="destSub">El destino se lee en el QR al salir de carga.</small></div></div>
+        </section>
+        <section class="grp ctl">
+          <h3>Control</h3>
+          <div class="fld"><label>¿A qué almacén va el lote?</label>
+            <div class="destBtns" id="destBtns">
+              <button type="button" data-d="1">Almacén 1<small>QR-E1</small></button>
+              <button type="button" data-d="2">Almacén 2<small>QR-E2</small></button>
+              <button type="button" data-d="3">Almacén 3<small>QR-E3</small></button>
+            </div>
+            <select id="modoDest" hidden><option value="0">Sin elegir</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+            <div class="qrLeyenda"><span><b>QR-HOME</b> = estación de carga</span><span><b>QR-E1</b> = Almacén 1</span><span><b>QR-E2</b> = Almacén 2</span><span><b>QR-E3</b> = Almacén 3</span></div>
+            <p class="nota" id="destNota" style="margin-top:6px">El carro se detiene en cada estación y lee su QR; descarga solo al leer el QR del almacén elegido.</p></div>
+          <div class="fld"><label for="vel">Velocidad del carro</label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
+          <div class="row"><button class="btnAvanzar" id="btnEnviar" type="button">▶ AVANZAR</button><button class="paro btnParo2" id="btnParo2" type="button">⛔ PARO</button></div>
+          <p class="nota notaCtl" id="notaCtl"></p>
+        </section>
+        <section class="grp">
+          <h3>Entregas</h3>
+          <div class="cuenta"><div><b id="c1">0</b><small>Almacén 1</small></div><div><b id="c2">0</b><small>Almacén 2</small></div><div><b id="c3">0</b><small>Almacén 3</small></div><div class="piso"><b id="cPiso">0</b><small>Vasos al piso</small></div></div>
+        </section>
+        <section class="grp">
+          <h3>Registro</h3>
+          <ul id="registro"></ul>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== COMUNICACIÓN ===================== -->
+  <section id="vComm" hidden>
+    <h2>Comunicación</h2>
+    <p class="sub" id="commSub"></p>
+    <div class="commGrid">
+      <section class="grp wide">
+        <div class="cardHead"><h3>¿Qué carro usa esta página?</h3><span class="pill ok" id="modoPill">—</span></div>
+        <div class="modoBtns">
+          <button type="button" class="modoBtn" data-modo="esp"><b>Carro real (ESP32 por WiFi)</b><small>Muestra y maneja el carro de verdad. No usa cables ni puertos.</small></button>
+          <button type="button" class="modoBtn" data-modo="sim"><b>Simulador (sin carro)</b><small>Carro virtual en esta página para probar con el HMI y la tienda</small></button>
+        </div>
+      </section>
+
+      <section class="grp" id="cardEsp">
+        <div class="cardHead"><h3>Carro ESP32</h3><span class="pill" id="espPill">SIN CONEXIÓN</span></div>
+        <div class="kvs">
+          <div><small>Red WiFi del carro</small><b id="kvRed">—</b></div>
+          <div><small>IP del carro</small><b id="kvIp">—</b></div>
+          <div><small>Modo del carro</small><b id="kvModo">—</b></div>
+          <div><small>Estado</small><b id="kvEstado">—</b></div>
+        </div>
+        <div class="ultima" id="espTxt">Esperando al carro…</div>
+        <p class="nota" style="margin-top:10px">El carro se conecta solo al servidor por WiFi. Si no aparece "EN LÍNEA", revisa los pasos de la derecha.</p>
+      </section>
+
+      <section class="grp" id="cardPasos">
+        <h3>Si el carro no se conecta</h3>
+        <ol class="pasos">
+          <li>El carro y la laptop de la rueda deben estar en la <b>misma red WiFi de 2.4 GHz</b>.</li>
+          <li>En la laptop de la rueda debe estar corriendo <code>npm start</code>.</li>
+          <li>El nombre y la contraseña de esa red van en el programa del carro (<code>WIFI_RED</code> y <code>WIFI_CLAVE</code>) o en su panel.</li>
+          <li>Para ver el panel del carro: conéctate a la red <code>SeguidorLineaPID</code> (clave <code>linea1234</code>) y abre <code>http://192.168.4.1</code> → Mantenimiento → Red y servidor.</li>
+          <li>Si Windows preguntó por el firewall al hacer <code>npm start</code>, debe estar en <b>Permitir</b>.</li>
+        </ol>
+      </section>
+
+      <section class="grp">
+        <div class="cardHead"><h3>Servidor</h3><span class="pill" id="srvPill">SIN CONEXIÓN</span></div>
+        <div class="fld"><label for="srvDir">Dirección del servidor (IP:puerto)</label><input type="text" id="srvDir" placeholder="192.168.1.50:3000"></div>
+        <p class="nota" style="margin-top:8px">Si abriste esta página con el link que muestra la terminal, la dirección ya es la correcta.</p>
+        <div class="row" style="margin-top:10px"><button class="btn" id="btnSrv" type="button">Guardar y reconectar</button></div>
+        <div class="ultima" id="hmiTxt">HMI: sin conexión</div>
+      </section>
+    </div>
+  </section>
+</main>
+<footer id="pie">● —</footer>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   AGV-01 · Página del carro de entrega (seguidor de línea)
+   - CARRO REAL: el ESP32 va por WiFi al servidor; esta página lo muestra y le manda órdenes (rol "agv_vista").
+   - SIMULADOR: carro virtual con los mismos eventos (rol "agv").
+   - Se comunica con el HMI por el servidor (rol "agv"):
+       HMI → carro  {tipo:"agv_cmd", cmd:"despachar"|"vaso"|"paro", ...}
+       carro → HMI  {tipo:"agv_estado", ...}  y  {tipo:"agv_evento", ev, lote, almacen}
+   ===================================================================== */
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- modo ----------
+   "esp" = CARRO REAL: el ESP32 se conecta solo al servidor por WiFi; esta página solo lo MUESTRA y le manda
+           órdenes (detener, enviar, destino, velocidad) a través del servidor. No usa cables ni puertos.
+   "sim" = SIMULADOR: carro virtual dentro de esta página (para probar sin el carro). */
+const MODO_KEY = "agv01_modo";
+const MODO_SIM = (() => {
+  try{
+    const q = new URLSearchParams(location.search).get("modo");
+    if(q === "sim" || q === "esp" || q === "fisico"){ localStorage.setItem(MODO_KEY, q === "sim" ? "sim" : "esp"); return q === "sim"; }
+    return localStorage.getItem(MODO_KEY) === "sim";
+  }catch(_){ return false; }
+})();
+function cambiarModo(sim){
+  if(sim === MODO_SIM) return;
+  if(MODO_SIM && st.estado !== "CARGA" && !confirm("¿Cambiar a CARRO REAL? El carro simulado está en viaje y se detiene.")) return;
+  try{ localStorage.setItem(MODO_KEY, sim ? "sim" : "esp"); }catch(_){}
+  location.href = location.pathname;
+}
+
+/* ---------- configuración guardada ---------- */
+const CFG_KEY = "agv01_cfg";
+const cfg = { modo:"0", vel:60, srv:"" };
+try{ Object.assign(cfg, JSON.parse(localStorage.getItem(CFG_KEY) || "{}")); }catch(_){}
+cfg.modo = "0";                                          // v17: cada lote necesita que elijan su almacén
+const guardarCfg = () => { try{ localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); }catch(_){} };
+
+/* ---------- utilidades ---------- */
+let tToast = null;
+function toast(m){ const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(tToast); tToast = setTimeout(() => t.classList.remove("on"), 3200); }
+function log(m){
+  const li = document.createElement("li"), h = new Date().toLocaleTimeString("es-MX", { hour12:false });
+  li.innerHTML = `<b>${h}</b>`; li.append(m);
+  const r = $("#registro"); r.prepend(li); while(r.children.length > 60) r.lastChild.remove();
+}
+
+/* =====================================================================
+   CIRCUITO (mismo dibujo y misma línea que la vista del HMI)
+   ===================================================================== */
+const COLOR = ["#8a4060", "#d08a44", "#f2c12e"];
+const NOM = ["Frijol", "Lentejas", "Maíz"];
+const PARADAS = { carga:[280, 330], qr:[400, 470], a1:[650, 470], a2:[850, 290], a3:[560, 110] };
+const RUTA = "M 280 330 L 280 400 Q 280 470 350 470 L 780 470 Q 850 470 850 400 L 850 180 Q 850 110 780 110 L 350 110 Q 280 110 280 180 Z";
+const TXT = {
+  CARGA:["EN POSICIÓN DE CARGA", "Esperando el lote de la rueda"],
+  SALIENDO:["LOTE CARGADO", "Saliendo de la posición de carga"],
+  A_QR:["SIGUIENDO LA LÍNEA", "Rumbo al lector QR"],
+  LEYENDO_QR:["LEYENDO CÓDIGO QR", "Identificando el almacén de destino"],
+  A_ALMACEN:["SIGUIENDO LA LÍNEA", "Rumbo al almacén"],
+  EN_ESTACION:["LEYENDO CÓDIGO QR", "Detenido en una estación"],
+  DESCARGANDO:["DESCARGANDO", "Entregando el lote"],
+  ESPERA_DESTINO:["ELIGE EL ALMACÉN", "El lote está listo en el carro: elige a qué almacén va"],
+  REGRESANDO:["REGRESANDO", "Siguiendo la línea de vuelta a la posición de carga"]
+};
+const st = { estado:"CARGA", s:0, lado:0, fase:0, t:0, vasos:[], lote:null, pausado:false,
+             entregas:[0,0,0], piso:0, n:0, sigRot:1, linea:"" };
+let ruta = null, L = 0, S = {};
+
+function qrSvg(texto){
+  let h = 2166136261; for(const ch of texto){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return (h >>> 0) / 4294967296; };
+  const N = 25, finder = (x, y) => [[0,0],[N-7,0],[0,N-7]].some(([fx, fy]) => x >= fx && x < fx + 7 && y >= fy && y < fy + 7);
+  let r = "";
+  [[0,0],[N-7,0],[0,N-7]].forEach(([x, y]) => {
+    r += `<rect x="${x}" y="${y}" width="7" height="7" fill="#111"/><rect x="${x+1}" y="${y+1}" width="5" height="5" fill="#fff"/><rect x="${x+2}" y="${y+2}" width="3" height="3" fill="#111"/>`;
+  });
+  for(let y = 0; y < N; y++) for(let x = 0; x < N; x++){
+    if(finder(x, y)) continue;
+    if(rnd() < 0.48) r += `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="#111"/>`;
+  }
+  return r;
+}
+/* cuadrito QR pegado junto a la parada (mismo texto que el código real: QR-HOME, QR-E1…) */
+function qrEst(n, x, y, tx, ty){
+  return `<g class="qrE" id="qrE${n}"><rect class="fondo" x="${x}" y="${y}" width="44" height="44" rx="3"/>
+    <svg x="${x+3}" y="${y+3}" width="38" height="38" viewBox="0 0 25 25">${qrSvg("QR-" + n)}</svg>
+    <text x="${tx}" y="${ty}" text-anchor="middle">QR-${n}</text></g>`;
+}
+let ultQr = null;
+function qrLeido(n){
+  if(n >= 0) ultQr = n;
+  const g = $("#qrE" + (n === 0 ? "HOME" : "E" + n)); if(!g) return;
+  g.classList.add("leido"); setTimeout(() => g.classList.remove("leido"), 1800);
+}
+function dibujar(){
+  const alm = (n, x, y, w, h, tx, ty) =>
+    `<g class="alm" id="alm${n}"><rect class="edif" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
+      <path d="M${x} ${y+16}h${w}" stroke="#3b4659" stroke-width="2"/>
+      ${[0,1,2].map(k => { const ex = x+12+k*((w-24)/3), ew = (w-24)/3-8; ALM_GEO[n][k] = { x:ex, y:y+26, w:ew, h:h-36 };
+        return `<rect x="${ex}" y="${y+26}" width="${ew}" height="${h-36}" rx="3" fill="#141920" stroke="#2c3544"/>`; }).join("")}
+      <g id="almV${n}"></g>
+      <text class="tit" x="${tx}" y="${ty}" text-anchor="middle">Almacén ${n}</text>
+      <text class="num" x="${tx}" y="${ty+17}" text-anchor="middle" id="almN${n}">0 lotes</text></g>`;
+  for(let n = 1; n <= 3; n++) ALM_GEO[n] = [];
+  $("#svg").innerHTML = `
+    <defs><pattern id="pisoPat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#1b222c" stroke-width="1"/></pattern></defs>
+    <rect width="1000" height="600" fill="url(#pisoPat)"/>
+    <g transform="translate(120 230)">
+      <circle r="78" fill="#1a2029" stroke="#3b4659" stroke-width="3"/><circle r="56" fill="#29313d" stroke="#4a5568" stroke-width="2"/>
+      <circle r="12" fill="#5b6779"/><circle cx="0" cy="-44" r="11" fill="#07090c" stroke="#c9d1db" stroke-width="2"/><circle cx="0" cy="44" r="11" fill="#07090c" stroke="#c9d1db" stroke-width="2"/>
+      <text y="-92" text-anchor="middle" fill="#eef2f7" font-size="16" font-weight="700" font-family="system-ui,sans-serif">Rueda de Ginebra</text>
+    </g>
+    <path d="M150 300 L258 322" stroke="#f5a623" stroke-width="4" stroke-dasharray="8 7" fill="none"/>
+    <path d="M258 322 l-12 -9 m12 9 l-14 4" stroke="#f5a623" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <text x="150" y="350" text-anchor="middle" fill="#98a3b3" font-size="13" font-family="system-ui,sans-serif">Caída libre de</text>
+    <text x="150" y="366" text-anchor="middle" fill="#98a3b3" font-size="13" font-family="system-ui,sans-serif">vasos aprobados</text>
+    <path id="ruta" d="${RUTA}" fill="none" stroke="#05070a" stroke-width="16" stroke-linejoin="round"/>
+    <path d="${RUTA}" fill="none" stroke="#2a313c" stroke-width="1.5" stroke-dasharray="10 12"/>
+    <text x="565" y="300" text-anchor="middle" fill="#5f6b7c" font-size="14" font-family="system-ui,sans-serif">Línea guía · el carro la sigue con 3 sensores infrarrojos</text>
+    <g class="parada"><line x1="258" y1="330" x2="302" y2="330"/><text x="312" y="335" fill="#33c469" font-size="15" font-weight="700" font-family="system-ui,sans-serif">CARGA</text></g>
+    <svg id="qrPiso" width="0" height="0"></svg>
+    ${qrEst("HOME", 204, 284, 226, 342)}
+    ${qrEst("E1", 628, 398, 650, 392)}
+    ${qrEst("E2", 778, 268, 800, 326)}
+    ${qrEst("E3", 538, 140, 560, 198)}
+    <g class="parada"><line x1="650" y1="448" x2="650" y2="492"/></g>
+    <g class="parada"><line x1="828" y1="290" x2="872" y2="290"/></g>
+    <g class="parada"><line x1="560" y1="88" x2="560" y2="132"/></g>
+    ${alm(1, 590, 500, 120, 70, 790, 530)}
+    ${alm(2, 885, 225, 105, 130, 937, 375)}
+    ${alm(3, 500, 8, 120, 62, 690, 36)}
+    <g id="vuelos"></g>
+    <g id="carro">
+      <rect x="-30" y="-22" width="60" height="44" rx="9" fill="#2b3442" stroke="#c9d1db" stroke-width="2"/>
+      <rect x="-24" y="-27" width="16" height="7" rx="2" fill="#0d1117"/><rect x="8" y="-27" width="16" height="7" rx="2" fill="#0d1117"/>
+      <rect x="-24" y="20" width="16" height="7" rx="2" fill="#0d1117"/><rect x="8" y="20" width="16" height="7" rx="2" fill="#0d1117"/>
+      <rect x="-22" y="-15" width="36" height="30" rx="4" fill="#11161d" stroke="#4a5568"/>
+      <circle id="v0" cx="-13" cy="-6" r="6" fill="#1b222c"/><circle id="v1" cx="3" cy="-6" r="6" fill="#1b222c"/><circle id="v2" cx="-5" cy="7" r="6" fill="#1b222c"/>
+      <circle class="sens" id="s0" cx="26" cy="-10" r="3.6"/><circle class="sens" id="s1" cx="27" cy="0" r="3.6"/><circle class="sens" id="s2" cx="26" cy="10" r="3.6"/>
+      <rect x="18" y="-6" width="6" height="12" rx="1.5" fill="#3aafd9"/>
+    </g>`;
+  ruta = $("#ruta"); L = ruta.getTotalLength();
+  Object.entries(PARADAS).forEach(([k, [x, y]]) => {
+    let mejor = 0, d0 = Infinity;
+    for(let s = 0; s <= L; s += 2){ const p = ruta.getPointAtLength(s), d = (p.x - x) ** 2 + (p.y - y) ** 2; if(d < d0){ d0 = d; mejor = s; } }
+    S[k] = mejor;
+  });
+  if(S.carga > L / 2) S.carga = 0;
+  st.s = S.carga;
+  pintarAlmacenes();
+}
+/* ---------- vasos guardados en cada almacén (estante 1 = Frijol, 2 = Lentejas, 3 = Maíz) ---------- */
+const ALM_GEO = { 1:[], 2:[], 3:[] };
+const STOCK = { 1:[0, 0, 0], 2:[0, 0, 0], 3:[0, 0, 0] };   // vasos por grano en cada almacén
+function puntoVaso(n, g, k){                               // lugar del vaso número k (0..) del grano g en el almacén n
+  const e = ALM_GEO[n][g - 1]; if(!e) return null;
+  const porFila = Math.max(1, Math.floor(e.w / 12)), filas = Math.max(1, Math.floor(e.h / 12));
+  const kk = k % (porFila * filas), col = kk % porFila, fila = Math.floor(kk / porFila);
+  return { x:e.x + 6 + col * 12 + (e.w - porFila * 12) / 2, y:e.y + e.h - 6 - fila * 12 };
+}
+function pintarAlmacenes(){
+  for(let n = 1; n <= 3; n++){
+    const gr = $("#almV" + n); if(!gr) continue;
+    let h = "";
+    for(let g = 1; g <= 3; g++) for(let k = 0; k < STOCK[n][g - 1]; k++){
+      const p = puntoVaso(n, g, k); if(p) h += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${COLOR[g - 1]}" stroke="#0b0e13" stroke-width="1"/>`;
+    }
+    gr.innerHTML = h;
+  }
+}
+/* rampa del carro abierta hacia el almacén mientras descarga */
+function rampaDescarga(n, on){
+  const v = $("#vuelos"); if(!v) return;
+  const viejo = $("#rampaD"); if(viejo) viejo.remove();
+  const a = $("#alm" + n); if(a) a.classList.toggle("bajando", !!on);
+  if(!on) return;
+  const tr = ($("#carro").getAttribute("transform") || "").match(/translate\(([-\d.]+) ([-\d.]+)\)/);
+  const e = ALM_GEO[n][1]; if(!tr || !e) return;
+  const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  l.id = "rampaD"; l.setAttribute("x1", tr[1]); l.setAttribute("y1", tr[2]);
+  l.setAttribute("x2", (e.x + e.w / 2).toFixed(1)); l.setAttribute("y2", (e.y + e.h / 2).toFixed(1));
+  l.setAttribute("stroke", "#f5a623"); l.setAttribute("stroke-width", "5"); l.setAttribute("stroke-dasharray", "8 6"); l.setAttribute("stroke-linecap", "round");
+  v.appendChild(l);
+}
+/* animación: un vaso sale del carro y entra al estante de su grano en el almacén n */
+function descargarVaso(n, g){
+  if(!(n >= 1 && n <= 3 && g >= 1 && g <= 3)) return;
+  const fin = puntoVaso(n, g, STOCK[n][g - 1]);
+  const tr = ($("#carro").getAttribute("transform") || "").match(/translate\(([-\d.]+) ([-\d.]+)\)/);
+  const x0 = tr ? +tr[1] : 0, y0 = tr ? +tr[2] : 0;
+  const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  c.setAttribute("r", "6"); c.setAttribute("fill", COLOR[g - 1]); c.setAttribute("stroke", "#fff"); c.setAttribute("stroke-width", "1.5");
+  $("#vuelos").appendChild(c);
+  const t0 = performance.now(), T = 950;
+  const paso = now => {
+    const p = Math.min(1, (now - t0) / T), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    const x = x0 + ((fin ? fin.x : x0) - x0) * e, y = y0 + ((fin ? fin.y : y0) - y0) * e - Math.sin(Math.PI * p) * 40;
+    c.setAttribute("cx", x.toFixed(1)); c.setAttribute("cy", y.toFixed(1));
+    if(p < 1) requestAnimationFrame(paso);
+    else { c.remove(); STOCK[n][g - 1]++; pintarAlmacenes(); render(); }
+  };
+  requestAnimationFrame(paso);
+}
+const moviendo = () => ["SALIENDO", "A_QR", "A_ALMACEN", "REGRESANDO"].includes(st.estado) && !st.pausado;
+/* destino del PRÓXIMO lote (para iluminarlo en el mapa mientras el carro espera en carga) */
+function proximoDestino(){
+  if(MODO_SIM) return Number(cfg.modo) || 0;
+  const t = ESP.tel; if(!t) return 0;
+  return Number(t.modoDest) || 0;
+}
+function dibujarCarro(){
+  const s = ((st.s % L) + L) % L, p = ruta.getPointAtLength(s), q = ruta.getPointAtLength((s + 2) % L);
+  const ang = Math.atan2(q.y - p.y, q.x - p.x), nx = -Math.sin(ang), ny = Math.cos(ang);
+  $("#carro").setAttribute("transform", `translate(${(p.x + nx * st.lado).toFixed(1)} ${(p.y + ny * st.lado).toFixed(1)}) rotate(${(ang * 180 / Math.PI).toFixed(1)})`);
+  const l = sensores();
+  for(let i = 0; i < 3; i++) $("#s" + i).classList.toggle("on", l[i] === "1");
+  for(let i = 0; i < 3; i++){ const g = st.vasos[i]; $("#v" + i).setAttribute("fill", g ? COLOR[g - 1] : "#1b222c"); }
+}
+/* sensores de línea: en físico los reporta el Arduino; en simulador salen de la pequeña corrección del carro */
+function sensores(){
+  if(!MODO_SIM && ESP.tel && !ESP.tel.sim && st.linea.length === 3) return st.linea;
+  if(!moviendo()) return "010";
+  return Math.abs(st.lado) < 2.6 ? "010" : st.lado < 0 ? "110" : "011";
+}
+
+/* =====================================================================
+   VIAJE (común a los dos modos)
+   ===================================================================== */
+function velPx(){ return 40 + cfg.vel * 2.2; }                 // 20 % → 84 px/s · 100 % → 260 px/s
+function avanzarHasta(meta, dt){
+  const paso = velPx() * dt;
+  st.fase += dt * 5.5; st.lado = 3.2 * Math.sin(st.fase);      // pequeña corrección del seguidor de línea
+  if(st.s + paso >= meta){ st.s = meta; st.lado = 0; return true; }
+  st.s += paso; return false;
+}
+function elegirDestino(){
+  return Number(cfg.modo) || 0;                          // 0 = no han elegido almacén
+}
+const loteInfo = () => st.lote ? { n:st.lote.n, id:st.lote.id, destino:st.lote.destino } : null;
+function evento(ev, extra){ mandar(Object.assign({ tipo:"agv_evento", ev, lote:loteInfo(), almacen:st.lote ? st.lote.destino : null }, extra)); }
+
+/* el lote está completo (lo manda el HMI) o el operador lo envía a mano */
+function salir(lote){
+  if(st.estado !== "CARGA"){ toast("El carro no está en la posición de carga."); return false; }
+  if(!MODO_SIM){ ctl("salir"); log("Orden enviada al carro: salir ahora."); return true; }
+  if(!elegirDestino()){                                  // v17: sin almacén elegido el carro NO sale
+    st.estado = "ESPERA_DESTINO"; st.pendLote = lote || {};
+    log("⚠ El lote está listo, pero falta elegir el almacén. El carro sale en cuanto lo elijas.");
+    toast("Elige el almacén al que va el carro"); evento("sin_destino"); render(); publicar(true); return true;
+  }
+  st.n++;
+  st.lote = { id:lote && lote.id || null, p:lote && lote.p || null, n:st.n, destino:elegirDestino() };
+  st.estado = "SALIENDO"; st.t = 1.8;
+  log(`🚚 Sale con el lote ${st.n} (${st.vasos.length} vaso${st.vasos.length === 1 ? "" : "s"}) · destino previsto: Almacén ${st.lote.destino}.`);
+  evento("salio");
+  render(); publicar(true);
+  return true;
+}
+function vasoCae(g){
+  if(st.estado === "CARGA" || st.estado === "ESPERA_DESTINO"){ if(st.vasos.length < 6) st.vasos.push(g); log("Cayó un vaso aprobado al carro."); }
+  else { st.piso++; log("⚠ Un vaso aprobado cayó al piso: el carro no estaba en carga."); evento("piso"); toast("⚠ ¡Un vaso cayó al piso!"); }
+  render(); publicar(true);
+}
+function paro(on){
+  if(!MODO_SIM){ ctl("paro", { on:!!on }); log(on ? "⛔ Orden enviada: detener el carro." : "▶ Orden enviada: continuar."); return; }
+  st.pausado = !!on;
+  log(on ? "⛔ Carro detenido." : "▶ El carro continúa.");
+  render(); publicar(true);
+}
+/* pasos del viaje que cambian el estado y avisan al HMI */
+function leerQr(n){ if(st.lote) st.lote.destino = n; log(`🔳 QR leído: Almacén ${n}.`); st.estado = "A_ALMACEN"; evento("qr"); }
+/* v17: paradas del circuito en orden (cada almacén tiene su QR; HOME al final de la vuelta) */
+function siguienteParada(){
+  const lista = [1, 2, 3].map(n => ({ n, s:S["a" + n] })).concat([{ n:0, s:L + S.carga }]).sort((a, b) => a.s - b.s);
+  return lista.find(p => p.s > st.s + 0.5) || lista[lista.length - 1];
+}
+function leerQrEstacion(n){
+  qrLeido(n);
+  const cod = n === 0 ? "QR-HOME" : "QR-E" + n;
+  const yendo = st.prev === "A_ALMACEN";
+  if(n === 0){ log("🔳 QR leído: QR-HOME."); evento("qr", { codigo:cod, estacion:0, almacen:null }); enCarga(); return; }
+  const destino = st.lote ? st.lote.destino : 0;
+  if(yendo && n === destino){ log(`🔳 QR leído: ${cod} · es su almacén.`); evento("qr", { codigo:cod, estacion:n, almacen:n }); llegar(n); return; }
+  log(`🔳 QR leído: ${cod} · de paso${yendo ? " (va al Almacén " + destino + ")" : ""}.`);
+  evento("qr", { codigo:cod, estacion:n, almacen:n });
+  st.estado = st.prev;                                   // sigue la línea
+}
+function llegar(n){ st.s = S["a" + n]; st.lado = 0; st.estado = "DESCARGANDO"; st.descN = st.vasos.length; st.descK = 0; st.t = 0.8 + 1.2 * st.vasos.length + 0.8; st.tSig = 0.8; rampaDescarga(n, true); log(`Llegó al Almacén ${n}: descargando ${st.vasos.length} vaso${st.vasos.length === 1 ? "" : "s"}.`); evento("llegada"); }
+function bajarUnVaso(n){                                  // simulador: el siguiente vaso del carro pasa al almacén
+  if(!st.vasos.length) return;
+  const g = st.vasos.shift(); descargarVaso(n, g); st.descK++;
+  log(`⬇ Vaso de ${NOM[g - 1] || "grano"} descargado en el Almacén ${n}.`);
+}
+function entregar(n){
+  while(st.vasos.length) bajarUnVaso(n);
+  rampaDescarga(n, false); st.descN = 0;
+  st.entregas[n - 1]++; st.vasos = []; st.prev = "REGRESANDO";
+  log(`✔ Lote ${st.lote ? st.lote.n : ""} entregado en el Almacén ${n}. Regresa a carga.`);
+  evento("entregado"); st.estado = "REGRESANDO";
+}
+function enCarga(){ st.s = S.carga; st.lado = 0; st.estado = "CARGA"; st.lote = null; cfg.modo = "0"; $("#modoDest").value = "0"; log("🚚 En la posición de carga: listo para el siguiente lote."); evento("en_carga"); }
+
+let last = performance.now();
+function tick(){
+  const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if(MODO_SIM){ if(!st.pausado) pasoSimulador(dt); }
+  else pasoCarroReal(now);
+  dibujarCarro();
+  publicar(false);
+}
+/* SIMULADOR: el carro virtual hace todo el recorrido solo */
+function pasoSimulador(dt){
+  const ant = st.estado;
+  switch(st.estado){
+    case "SALIENDO": st.t -= dt; if(st.t <= 0) st.estado = "A_ALMACEN"; break;
+    case "A_ALMACEN": case "REGRESANDO": {                 // sigue la línea hasta la siguiente estación
+      const p = siguienteParada();
+      if(avanzarHasta(p.s, dt)){ st.prev = st.estado; st.estado = "EN_ESTACION"; st.t = 1.5; st.qrN = p.n; qrLeido(p.n); render(); }
+      break;
+    }
+    case "EN_ESTACION": st.t -= dt; if(st.t <= 0) leerQrEstacion(st.qrN); break;   // detenido leyendo el QR
+    case "DESCARGANDO":
+      st.t -= dt; st.tSig -= dt;
+      if(st.tSig <= 0 && st.vasos.length){ bajarUnVaso(st.lote.destino); st.tSig = 1.2; render(); publicar(true); }
+      if(st.t <= 0) entregar(st.lote.destino);
+      break;
+  }
+  if(st.estado !== ant){ render(); publicar(true); }
+}
+
+/* =====================================================================
+   CARRO REAL (ESP32 por WiFi): todo llega por el servidor
+   ===================================================================== */
+const ESP = { online:false, tel:null, sTel:0, tTel:0, movia:false, camposListos:false };
+function ctl(cmd, extra){
+  if(!SRV.abierto){ toast("Sin conexión con el servidor."); return; }
+  if(!ESP.online){ toast("El carro ESP32 no está conectado."); return; }
+  mandar(Object.assign({ tipo:"agv_ctl", cmd }, extra));
+}
+function delCarro(m){                                   // agv_estado del ESP32 (cada ~150 ms)
+  const clave = JSON.stringify([m.estado, m.pausado, m.vasos, m.lote, m.entregas, m.piso, m.sim, m.ssid, m.ip, m.modoDest, m.sigRot]);
+  const cambio = clave !== ESP.clave; ESP.clave = clave;
+  ESP.tel = m; ESP.online = true;
+  st.estado = m.estado || "CARGA"; st.pausado = !!m.pausado; st.vasos = m.vasos || [];
+  st.lote = m.lote || null; st.entregas = m.entregas || [0, 0, 0]; st.piso = m.piso || 0; st.linea = m.linea || "";
+  let s = Number(m.s) || 0;
+  if(st.estado === "REGRESANDO" && s < ESP.sTel - L / 2) s += L;
+  ESP.movia = Math.abs(s - ESP.sTel) > 0.5; ESP.sTel = s; ESP.tTel = performance.now();
+  if(!ESP.camposListos){
+    ESP.camposListos = true;
+    $("#modoDest").value = m.modoDest ? String(m.modoDest) : "0";
+    if(m.vel){ $("#vel").value = m.vel; cfg.vel = m.vel; }
+  }
+  if(cambio) render();
+}
+function delCarroEvento(m){
+  const d = m.almacen, lt = m.lote;
+  switch(m.ev){
+    case "salio":       log(`🚚 Sale con el lote ${lt ? lt.n : ""} hacia el Almacén ${lt ? lt.destino : "?"}.`); break;
+    case "qr":          qrLeido(m.estacion === 0 ? 0 : (m.estacion || d || -1)); log(`🔳 QR leído: ${m.codigo || (d ? "QR-E" + d : "QR")}${lt && d && d !== lt.destino ? " · de paso" : ""}.`); break;
+    case "llegada":     ESP.vasosLote = (ESP.tel && ESP.tel.vasos || []).slice(); log(`✔ Llegó al Almacén ${d}: descargando.`); break;
+    case "entregado": {
+      const vs = ESP.vasosLote && ESP.vasosLote.length ? ESP.vasosLote : (ESP.tel && ESP.tel.vasos || []);
+      rampaDescarga(d, true); vs.forEach((g, i) => setTimeout(() => descargarVaso(d, g), i * 1100));
+      setTimeout(() => rampaDescarga(d, false), vs.length * 1100 + 900); ESP.vasosLote = null;
+      log(`✔ Lote entregado en el Almacén ${d} (${vs.length} vaso${vs.length === 1 ? "" : "s"}). Regresa a carga.`); break;
+    }
+    case "en_carga":    ultQr = 0; log("🚚 En la posición de carga: listo para el siguiente lote."); break;
+    case "piso":        toast("⚠ ¡Un vaso aprobado cayó al piso!"); log("⚠ Vaso aprobado al piso."); break;
+    case "no_disponible": log("⚠ El carro no pudo salir."); break;
+    case "sin_destino":   toast("Elige el almacén: el carro no sale sin destino."); log("⚠ El lote está listo, pero falta elegir el almacén."); break;
+  }
+}
+/* el dibujo avanza suave entre dos datos del carro, sin pasarse de la parada a la que va */
+function pasoCarroReal(now){
+  const viaja = moviendo();
+  let obj = ESP.sTel;
+  if(viaja && ESP.movia){
+    obj += velPx() * Math.min(0.25, (now - ESP.tTel) / 1000);
+    const lim = st.estado === "SALIENDO" && st.lote ? S["a" + st.lote.destino] : st.estado === "REGRESANDO" ? L : Infinity;
+    obj = Math.min(obj, lim);
+  }
+  if(st.estado === "CARGA") obj = S.carga;
+  if(Math.abs(obj - st.s) > L / 3) st.s = obj; else st.s += (obj - st.s) * 0.18;
+  st.lado = viaja && ESP.tel && ESP.tel.sim ? 3.2 * Math.sin(now / 380) : (ESP.tel ? ESP.tel.lado || 0 : 0);
+}
+const visible = sel => !$(sel).hidden;
+
+/* =====================================================================
+   SERVIDOR (comunicación con el HMI)
+   ===================================================================== */
+const SRV = { ws:null, abierto:false, hmi:false, reintento:null };
+function urlServidor(){
+  if(location.protocol.startsWith("http")) return (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+  const a = (cfg.srv || "").trim().replace(/^wss?:\/\//, "").replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  return a ? "ws://" + a : null;
+}
+function mandar(o){ if(SRV.abierto && SRV.ws.readyState === 1) SRV.ws.send(JSON.stringify(o)); }
+function conectarServidor(){
+  clearTimeout(SRV.reintento);
+  const url = urlServidor();
+  if(!url){ render(); return; }
+  try{ SRV.ws = new WebSocket(url); }catch(_){ SRV.reintento = setTimeout(conectarServidor, 4000); return; }
+  const ws = SRV.ws;
+  ws.onopen = () => ws.send(JSON.stringify({ tipo:"hola", rol:MODO_SIM ? "agv" : "agv_vista" }));
+  ws.onmessage = (e) => {
+    let m; try{ m = JSON.parse(e.data); }catch(_){ return; }
+    if(m.tipo === "hola_ok"){ SRV.abierto = true; SRV.hmi = !!m.hmi; if(!MODO_SIM) ESP.online = !!m.agv; log("🌐 Conectado al servidor."); publicar(true); }
+    else if(!MODO_SIM && m.tipo === "agv"){ ESP.online = !!m.en_linea; if(!ESP.online) ESP.tel = null; log(ESP.online ? "🚚 El carro ESP32 se conectó." : "⚠ El carro ESP32 se desconectó."); }
+    else if(!MODO_SIM && m.tipo === "agv_estado"){ delCarro(m); return; }
+    else if(!MODO_SIM && m.tipo === "agv_evento"){ delCarroEvento(m); }
+    else if(m.tipo === "hmi"){ SRV.hmi = !!m.en_linea; log(SRV.hmi ? "🌐 El HMI está en línea." : "⚠ El HMI se desconectó."); if(SRV.hmi) publicar(true); }
+    else if(MODO_SIM && m.tipo === "agv_cmd") deHmi(m);
+    else if(m.tipo === "error"){ toast("Servidor: " + m.msg); log("⚠ Servidor: " + m.msg); }
+    render();
+  };
+  ws.onclose = () => {
+    if(SRV.ws !== ws) return;
+    SRV.abierto = false; SRV.hmi = false; render();
+    SRV.reintento = setTimeout(conectarServidor, 3000);
+  };
+}
+function deHmi(m){
+  switch(m.cmd){
+    case "despachar": salir(m.lote || {}); break;
+    case "vaso": if(m.g >= 1 && m.g <= 3) vasoCae(m.g); break;
+    case "paro": paro(!!m.on); break;
+  }
+}
+let ultPub = 0, ultFuerte = 0;
+function publicar(forzar){
+  if(!MODO_SIM) return;                                  // el carro real publica su propio estado
+  const now = Date.now();
+  if(!forzar && !(moviendo() && now - ultPub >= 120) && now - ultFuerte < 2000) return;
+  ultPub = now; if(forzar || !moviendo()) ultFuerte = now;
+  const estadoPub = st.estado === "EN_ESTACION" ? (st.prev === "REGRESANDO" ? "REGRESANDO" : "SALIENDO") : st.estado === "A_ALMACEN" ? "SALIENDO" : st.estado;
+  mandar({ tipo:"agv_estado", estado:estadoPub, s:Math.round(st.s * 10) / 10, lado:Math.round(st.lado * 10) / 10,
+           vasos:st.vasos, lote:loteInfo(), pausado:st.pausado, entregas:st.entregas, piso:st.piso,
+           modo:"sim", puerto:true, linea:sensores() });
+}
+
+/* =====================================================================
+   INTERFAZ
+   ===================================================================== */
+function render(){
+  const e = $("#estado");
+  let [t1, t2] = TXT[st.estado] || ["—", ""], cls = st.estado === "CARGA" ? "carga" : "ruta";
+  if(st.pausado){ t1 = "CARRO DETENIDO"; t2 = "Presiona CONTINUAR para seguir."; cls = "paro"; }
+  else if(!MODO_SIM && !ESP.online){ t1 = "CARRO SIN CONEXIÓN"; t2 = "El carro ESP32 no está conectado al servidor."; cls = "paro"; }
+  else if(st.lote && (st.estado === "A_ALMACEN" || (!MODO_SIM && st.estado === "SALIENDO"))) t2 = `Rumbo al Almacén ${st.lote.destino}`;
+  else if(st.estado === "EN_ESTACION") t2 = `Leyendo ${st.qrN ? "QR-E" + st.qrN : "QR-HOME"}${st.lote && st.prev === "A_ALMACEN" ? " · va al Almacén " + st.lote.destino : ""}`;
+  else if(st.lote && st.estado === "DESCARGANDO") t2 = st.descN ? `Bajando vaso ${Math.min(st.descK + 1, st.descN)} de ${st.descN} al Almacén ${st.lote.destino}` : `Entregando en el Almacén ${st.lote.destino}`;
+  else if(st.estado === "CARGA" && st.vasos.length) t2 = `Recibiendo vasos aprobados: ${st.vasos.length}`;
+  e.className = "estado " + cls; e.querySelector("b").textContent = t1; e.querySelector("small").textContent = t2;
+  [...$("#vasos").children].forEach((sp, i) => { const g = st.vasos[i]; sp.classList.toggle("lleno", !!g); sp.style.setProperty("--c", g ? COLOR[g - 1] : "transparent"); });
+  const leido = !!st.lote;
+  const prox = proximoDestino();
+  $("#destTxt").textContent = st.lote ? `ALMACÉN ${st.lote.destino}` : prox ? `PRÓXIMO: ALMACÉN ${prox}` : "SIN ELEGIR";
+  $("#destSub").textContent = !st.lote ? (prox ? "El lote irá a ese almacén." : "Elige el almacén en Control. Sin almacén el carro no avanza.") : `Lote ${st.lote.n} · descarga al leer QR-E${st.lote.destino}`;
+  const dq = st.lote ? st.lote.destino : prox;
+  $("#qr").innerHTML = dq ? qrSvg("QR-E" + dq) : "";
+  $("#qr").style.visibility = dq ? "" : "hidden";
+  for(let n = 1; n <= 3; n++){
+    $("#alm" + n).classList.toggle("dest", !!(leido && st.lote.destino === n));
+    $("#alm" + n).classList.toggle("prox", !st.lote && prox === n);
+    const nv = STOCK[n].reduce((a, b) => a + b, 0);
+    $("#almN" + n).textContent = `${st.entregas[n - 1]} lote${st.entregas[n - 1] === 1 ? "" : "s"} · ${nv} vaso${nv === 1 ? "" : "s"}`;
+    $("#c" + n).textContent = st.entregas[n - 1];
+  }
+  $("#cPiso").textContent = st.piso;
+  const valDest = MODO_SIM ? cfg.modo : (ESP.tel ? String(ESP.tel.modoDest || 0) : $("#modoDest").value);
+  $$("#destBtns button").forEach(b => b.classList.toggle("on", b.dataset.d === valDest));
+  let porque = "";
+  if(!MODO_SIM && !SRV.abierto) porque = "No se puede: esta página no está conectada al servidor (abre la pestaña Comunicación).";
+  else if(!MODO_SIM && !ESP.online) porque = "No se puede: el carro ESP32 no está conectado al servidor. Enciéndelo y espera a que diga EN LÍNEA.";
+  else if(st.pausado) porque = "El carro está en PARO. Pulsa CONTINUAR para que siga.";
+  else if(st.estado === "ESPERA_DESTINO") porque = "El lote está listo: elige el almacén (1, 2 o 3) y el carro sale solo.";
+  else if(st.estado !== "CARGA") porque = "AVANZAR solo funciona cuando el carro está en la estación de carga (QR-HOME).";
+  else if(!proximoDestino()) porque = "Primero elige a qué almacén va (1, 2 o 3). Sin almacén el carro no avanza.";
+  $("#btnEnviar").disabled = !!porque;
+  $("#destBtns").classList.toggle("pide", !proximoDestino() && (st.estado === "CARGA" || st.estado === "ESPERA_DESTINO"));
+  const nc = $("#notaCtl"); nc.classList.toggle("mal", !!porque);
+  nc.textContent = porque || (MODO_SIM
+    ? "Modo simulador: AVANZAR saca el carro virtual. PARO lo detiene donde esté."
+    : "Listo: AVANZAR saca el carro hacia el almacén elegido. PARO lo detiene donde esté.");
+  [$("#btnParo"), $("#btnParo2")].forEach(bp => { bp.textContent = st.pausado ? "▶ CONTINUAR" : "⛔ PARO"; bp.classList.toggle("cont", st.pausado); });
+  $("#lugar").innerHTML = "Último QR leído: <b>" + (ultQr === null ? (st.estado === "CARGA" ? "en carga" : "—") : ultQr === 0 ? "QR-HOME · estación de carga" : "QR-E" + ultQr + " · Almacén " + ultQr) + "</b>";
+  // chips
+  $("#chipSrv").classList.toggle("ok", SRV.abierto);
+  $("#chipHmi").classList.toggle("ok", SRV.hmi);
+  const cp = $("#chipEsp"); cp.classList.toggle("ok", MODO_SIM || ESP.online);
+  cp.lastChild.textContent = MODO_SIM ? "CARRO SIMULADO" : ESP.online ? `CARRO ESP32 · ${ESP.tel && ESP.tel.sim ? "SIM" : "FÍS"}` : "CARRO ESP32";
+  // comunicación
+  $("#srvPill").textContent = SRV.abierto ? "CONECTADO" : "SIN CONEXIÓN"; $("#srvPill").classList.toggle("ok", SRV.abierto);
+  $("#hmiTxt").textContent = !SRV.abierto ? (urlServidor() ? "Conectando con el servidor…" : "Escribe la dirección del servidor.") : SRV.hmi ? "HMI: en línea" : "HMI: sin conexión (abre el HMI en la laptop de la rueda)";
+  const t = ESP.tel;
+  $("#espPill").textContent = ESP.online ? "EN LÍNEA" : "SIN CONEXIÓN"; $("#espPill").classList.toggle("ok", ESP.online);
+  $("#kvRed").textContent = t && t.ssid ? t.ssid : "—";
+  $("#kvIp").textContent = t && t.ip ? t.ip : "—";
+  $("#kvModo").textContent = t ? (t.sim ? "Simulador (motores apagados)" : "Físico") : "—";
+  $("#kvEstado").textContent = ESP.online ? (TXT[st.estado] || [st.estado])[0] : "—";
+  $("#espTxt").textContent = !SRV.abierto ? "Primero esta página debe conectarse al servidor." : ESP.online ? "✔ El carro está conectado y se comunica con el HMI y la tienda." : "El carro todavía no se conecta al servidor. Revisa los pasos de la derecha.";
+  $("#pie").textContent = `● ${MODO_SIM ? "MODO SIMULADOR" : "CARRO REAL (ESP32) · " + (ESP.online ? "en línea" : "sin conexión")} · ${SRV.abierto ? "servidor conectado" : "sin servidor"} · ${SRV.hmi ? "HMI en línea" : "HMI sin conexión"} · ${(TXT[st.estado] || [""])[0].toLowerCase()}`;
+}
+
+/* ---------- arranque ---------- */
+(function iniciar(){
+  dibujar();
+  document.title = MODO_SIM ? "AGV-01 · SIMULADOR" : "AGV-01 · Carro real";
+  $("#cardEsp").hidden = MODO_SIM; $("#cardPasos").hidden = MODO_SIM;
+  $("#marcaSub").textContent = MODO_SIM ? "SIMULADOR" : "CARRO DE ENTREGA";
+  const cm = $("#chipModo"); cm.textContent = MODO_SIM ? "MODO SIMULADOR" : "CARRO REAL"; cm.classList.toggle("fisico", !MODO_SIM);
+  cm.addEventListener("click", () => cambiarModo(!MODO_SIM));
+  $("#modoPill").textContent = MODO_SIM ? "SIMULADOR" : "CARRO REAL";
+  $$(".modoBtn").forEach(b => {
+    const esSim = b.dataset.modo === "sim";
+    b.classList.toggle("on", esSim === MODO_SIM); b.setAttribute("aria-pressed", String(esSim === MODO_SIM));
+    b.addEventListener("click", () => cambiarModo(esSim));
+  });
+  $("#commSub").textContent = MODO_SIM
+    ? "Modo simulador: el carro es virtual. Igual se comunica de verdad con el HMI por el servidor. (Si el carro ESP32 está encendido y conectado, apágalo: solo puede haber un carro.)"
+    : "Carro real: el ESP32 se conecta solo al servidor por WiFi. Esta página solo lo muestra y le manda órdenes; no necesitas conectarte a la red del carro.";
+  $$(".tab").forEach(t => t.addEventListener("click", () => {
+    $$(".tab").forEach(x => x.classList.toggle("on", x === t));
+    $("#vCarro").hidden = t.dataset.v !== "vCarro"; $("#vComm").hidden = t.dataset.v !== "vComm";
+  }));
+  $("#modoDest").value = cfg.modo; $("#vel").value = cfg.vel;
+  $$("#destBtns button").forEach(b => b.addEventListener("click", () => {
+    const sel = $("#modoDest"); sel.value = b.dataset.d; sel.dispatchEvent(new Event("change"));
+    toast(`El lote irá al Almacén ${b.dataset.d}`);
+  }));
+  $("#modoDest").addEventListener("change", e => {
+    cfg.modo = e.target.value; guardarCfg();
+    if(!MODO_SIM){ const v = Number(e.target.value) || 0;
+      if(SRV.abierto && ESP.online){ ctl("modoDest", { v }); if(ESP.tel) ESP.tel.modoDest = v;
+        log(`Destino elegido: ${v ? "Almacén " + v : "rotativo"}${st.lote ? " (aplica al siguiente lote)" : ""}.`); }
+      else ctl("modoDest", { v }); }
+    if(MODO_SIM && st.estado === "ESPERA_DESTINO" && Number(e.target.value)){   // el lote esperaba su almacén: sale ya
+      st.estado = "CARGA"; log(`Almacén ${e.target.value} elegido: el carro sale.`); salir(st.pendLote); st.pendLote = null;
+    }
+    else if(MODO_SIM && st.lote && st.estado !== "DESCARGANDO" && st.estado !== "REGRESANDO" && Number(e.target.value)){
+      st.lote.destino = Number(e.target.value); log(`Destino cambiado: Almacén ${st.lote.destino}.`); publicar(true);
+    }
+    render();
+  });
+  $("#vel").addEventListener("input", e => { cfg.vel = Number(e.target.value); guardarCfg(); });
+  $("#vel").addEventListener("change", e => { if(!MODO_SIM) ctl("vel", { v:Number(e.target.value) }); });
+  $("#btnEnviar").addEventListener("click", () => {
+    if(!SRV.hmi || confirm("¿Enviar el carro ahora? Si la rueda está armando un lote, los vasos que falten caerán al piso.")) salir({ id:null, p:null });
+  });
+  $("#btnParo").addEventListener("click", () => paro(!st.pausado));
+  $("#btnParo2").addEventListener("click", () => paro(!st.pausado));
+  $("#srvDir").value = location.protocol.startsWith("http") ? location.host : cfg.srv;
+  $("#srvDir").disabled = location.protocol.startsWith("http");
+  $("#btnSrv").addEventListener("click", () => {
+    cfg.srv = $("#srvDir").value.trim(); guardarCfg();
+    try{ if(SRV.ws) { const w = SRV.ws; SRV.ws = null; w.close(); } }catch(_){}
+    SRV.abierto = false; SRV.hmi = false; conectarServidor(); render();
+  });
+  setInterval(() => { $("#reloj").textContent = new Date().toLocaleTimeString("es-MX", { hour12:false }); }, 500);
+  log(MODO_SIM ? "Modo simulador: carro virtual en la posición de carga." : "Carro real: esperando los datos del carro ESP32…");
+  render(); conectarServidor();
+  setInterval(tick, 40);
+})();
+</script>
+</body>
+</html>

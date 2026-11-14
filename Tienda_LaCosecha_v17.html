@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0f14">
+<title>La Cosecha · Tienda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --milpa:#173326; --milpa2:#21483a; --milpa3:#2c5b49;
+  --costal:#e2cfa3; --costal2:#cdb47f; --costura:#8f7443;
+  --tinta:#fbf6ea; --tenue:#b9cbbf; --tinta-osc:#3a2a17;
+  --maiz:#f2b632; --maiz-osc:#b9820b;
+  --ok:#6cc08b; --mal:#ff8a7a;
+  --f:"Baloo 2","Trebuchet MS","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  background:
+    radial-gradient(1200px 700px at 15% -10%,#2a5543 0,transparent 60%),
+    radial-gradient(900px 600px at 110% 110%,#10261c 0,transparent 60%),
+    var(--milpa);
+  color:var(--tinta);font-family:var(--f);font-size:clamp(15px,1.25vw,20px);line-height:1.35;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;
+}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:3px solid var(--maiz);outline-offset:3px}
+[hidden]{display:none!important}
+
+/* ---------- estructura a pantalla completa ---------- */
+.app{height:100vh;height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+  padding:clamp(10px,1.4vw,22px) clamp(14px,2.2vw,36px) clamp(10px,1.2vw,18px);gap:clamp(10px,1.4vw,20px)}
+
+.top{display:flex;align-items:center;gap:clamp(12px,2vw,32px)}
+.marca{display:flex;align-items:center;gap:12px;flex:none}
+.marca svg{width:clamp(38px,3.6vw,56px);height:auto}
+.marca b{display:block;font-size:clamp(24px,2.4vw,38px);font-weight:800;line-height:1;letter-spacing:.01em}
+.marca span{display:block;color:var(--tenue);font-size:.85em}
+
+.pasos{list-style:none;margin:0 auto;padding:0;display:flex;gap:6px;counter-reset:p}
+.pasos li{counter-increment:p;display:flex;align-items:center;gap:8px;padding:6px 16px 6px 8px;border-radius:999px;
+  color:var(--tenue);background:rgba(255,255,255,.05);font-weight:600;transition:background .3s,color .3s}
+.pasos li::before{content:counter(p);display:grid;place-items:center;width:1.7em;height:1.7em;border-radius:50%;
+  background:rgba(255,255,255,.1);font-weight:800}
+.pasos li.on{background:var(--maiz);color:var(--tinta-osc)}
+.pasos li.on::before{background:var(--tinta-osc);color:var(--maiz)}
+.pasos li.hecho{color:var(--tinta)}
+.pasos li.hecho::before{content:"✓";background:var(--ok);color:var(--milpa)}
+
+.der{display:flex;align-items:center;gap:10px;flex:none}
+.con{font-size:.8em;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--tenue);white-space:nowrap}
+.con.on{background:rgba(108,192,139,.2);color:#9fe0b6}
+.fs{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.08);display:grid;place-items:center}
+.fs svg{width:22px;height:22px}
+
+main{min-height:0;position:relative}
+.vista{height:100%;min-height:0}
+
+/* ---------- vista 1: elegir ---------- */
+#vElegir{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,27vw,440px);gap:clamp(14px,2vw,30px)}
+.elegir{display:flex;flex-direction:column;min-height:0}
+.elegir h1{margin:0;font-size:clamp(28px,3.2vw,54px);font-weight:800;line-height:1.05}
+.elegir .bajada{margin:4px 0 clamp(8px,1.4vh,18px);color:var(--tenue);font-size:1.05em}
+.costales{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(12px,1.6vw,26px)}
+
+.costal{position:relative;display:flex;flex-direction:column;align-items:center;min-height:0;
+  padding:clamp(8px,1.2vh,16px) clamp(10px,1vw,18px) clamp(10px,1.4vh,18px);border-radius:26px;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:2px solid rgba(255,255,255,.08);
+  transition:border-color .25s,background .25s}
+.costal.tiene{border-color:var(--maiz);background:linear-gradient(180deg,rgba(242,182,50,.16),rgba(242,182,50,.04))}
+.costal svg.saco{flex:1;min-height:0;width:100%;max-height:44vh}
+.costal h3{margin:4px 0 0;font-size:clamp(22px,2.1vw,34px);font-weight:800;line-height:1}
+.costal .dato{margin:4px 0 10px;color:var(--tenue);font-size:.88em;text-align:center;max-width:30ch;min-height:4em}
+.ctl{display:flex;align-items:center;gap:clamp(10px,1vw,18px)}
+.ctl button{width:clamp(54px,4.6vw,74px);height:clamp(54px,4.6vw,74px);border-radius:50%;font-size:clamp(30px,2.6vw,42px);
+  font-weight:700;line-height:1;background:var(--milpa3);color:var(--tinta);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25);
+  transition:transform .1s,background .15s}
+.ctl button.mas{background:var(--maiz);color:var(--tinta-osc)}
+.ctl button:active:not(:disabled){transform:scale(.88)}
+.ctl button:disabled{opacity:.28}
+.ctl b{min-width:1.3ch;text-align:center;font-size:clamp(34px,3vw,50px);font-weight:800}
+.insignia{position:absolute;top:12px;right:12px;min-width:44px;height:44px;padding:0 10px;border-radius:999px;display:grid;place-items:center;
+  background:var(--maiz);color:var(--tinta-osc);font-weight:800;font-size:1.1em;transform:scale(0);transition:transform .35s cubic-bezier(.2,1.8,.4,1)}
+.costal.tiene .insignia{transform:scale(1)}
+.pop{animation:pop .35s cubic-bezier(.2,1.7,.4,1)}
+
+/* lote */
+.lote{display:flex;flex-direction:column;min-height:0;padding:clamp(14px,1.6vw,24px);border-radius:26px;
+  background:var(--costal);color:var(--tinta-osc);position:relative;
+  box-shadow:inset 0 0 0 7px var(--costal),inset 0 0 0 9px var(--costura)}
+.lote::after{content:"";position:absolute;inset:7px;border:2px dashed var(--costura);border-radius:20px;pointer-events:none;opacity:.55}
+.lote h2{margin:0;font-size:clamp(24px,2.2vw,36px);font-weight:800;line-height:1}
+.ayuda{margin:2px 0 10px;font-size:.95em;color:#6b5634;min-height:2.7em}
+.vasosSel{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex:1;min-height:0;align-items:end;margin-bottom:10px}
+.vasoSel{display:flex;flex-direction:column;align-items:center;gap:4px;min-height:0;height:100%;justify-content:flex-end}
+.vasoSel svg{width:100%;max-width:110px;height:auto;max-height:100%;min-height:0}
+.vasoSel small{font-weight:700;font-size:.8em;color:#6b5634;text-align:center;line-height:1.1;min-height:2.2em}
+.vasoSel .nivel{transition:transform .55s cubic-bezier(.3,1.3,.5,1);transform-box:fill-box;transform-origin:50% 100%}
+.lista{list-style:none;margin:0 0 12px;padding:0;font-size:.95em}
+.lista li{display:flex;align-items:center;gap:10px;padding:3px 0}
+.lista i{width:16px;height:16px;border-radius:50%;flex:none;background:var(--c)}
+.lista .vacio{color:#6b5634}
+.conf{position:relative;width:100%;min-height:clamp(64px,8vh,86px);border-radius:18px;font-size:clamp(20px,1.7vw,28px);font-weight:800;
+  background:var(--milpa);color:var(--tinta);box-shadow:0 5px 0 #0c1d15;transition:transform .1s,box-shadow .1s,background .2s}
+.conf:not(:disabled){background:var(--maiz);color:var(--tinta-osc);box-shadow:0 5px 0 var(--maiz-osc)}
+.conf:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--maiz-osc)}
+.conf:disabled{opacity:.5;cursor:default}
+
+/* ---------- vista 2: seguimiento ---------- */
+#vSeguir{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:clamp(14px,2.4vw,40px);align-items:center}
+.rueda-caja{height:100%;min-height:0;display:grid;place-items:center}
+#rueda{width:100%;height:100%;max-height:100%}
+#marcador{transform-origin:200px 200px;transition:transform 1.1s cubic-bezier(.6,0,.25,1)}
+.st circle{fill:var(--milpa);stroke:var(--costal2);stroke-width:3;transition:fill .3s,stroke .3s}
+.st text{fill:var(--tenue);font:700 17px var(--f);transition:fill .3s}
+.st path{stroke:var(--costal2);transition:stroke .3s}
+.st.on circle{fill:var(--maiz);stroke:var(--maiz)}
+.st.on path{stroke:var(--tinta-osc)}
+.st.on text{fill:var(--tinta)}
+.st.hecho circle{stroke:var(--ok)}
+.st.hecho path{stroke:var(--ok)}
+
+.seg{display:flex;flex-direction:column;gap:clamp(10px,2vh,22px);min-height:0}
+.seg h2{margin:0;font-size:clamp(32px,3.6vw,62px);font-weight:800;line-height:1}
+#msg{margin:0;font-size:clamp(20px,1.9vw,32px);min-height:2.6em;line-height:1.25}
+#msg.mal{color:var(--mal)} #msg.bien{color:#9fe0b6}
+.segv{display:flex;gap:clamp(14px,2.4vw,40px);align-items:flex-end}
+.copa{display:flex;flex-direction:column;align-items:center;gap:6px;opacity:.5;transition:opacity .4s,transform .4s}
+.copa.esp,.copa.sirv{opacity:1;transform:translateY(-8px)}
+.copa.hecho{opacity:1}
+.copa svg{width:clamp(80px,8vw,130px);height:auto}
+.copa .nivel{transform-box:fill-box;transform-origin:50% 100%;transform:scaleY(0)}
+.copa.sirv .nivel{transform:scaleY(1);transition:transform 3s linear}
+.copa.hecho .nivel{transform:scaleY(1);transition:transform .3s}
+.copa .chk{opacity:0}
+.copa.hecho .chk{opacity:1}
+.copa small{font-weight:800;font-size:clamp(15px,1.3vw,21px)}
+.copa .est{font-weight:600;color:var(--tenue);font-size:.85em;margin-top:-6px}
+.chorro{height:34px;width:34px;position:relative;visibility:hidden}
+.copa.sirv .chorro{visibility:visible}
+.chorro i{position:absolute;top:0;width:9px;height:9px;border-radius:40%;background:var(--c);animation:llover .55s linear infinite}
+.chorro i:nth-child(1){left:4px}.chorro i:nth-child(2){left:13px;animation-delay:.18s}.chorro i:nth-child(3){left:22px;animation-delay:.36s}
+#otro{align-self:flex-start;min-width:min(100%,380px);min-height:76px;padding:0 30px;border-radius:18px;font-size:clamp(20px,1.7vw,28px);font-weight:800;
+  background:var(--maiz);color:var(--tinta-osc);box-shadow:0 5px 0 var(--maiz-osc)}
+#otro:active{transform:translateY(4px);box-shadow:0 1px 0 var(--maiz-osc)}
+.cuenta-atras{color:var(--tenue);font-size:.85em;margin-top:-8px}
+
+/* ---------- pie: cómo funciona la máquina ---------- */
+.maquina{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:clamp(8px,1vw,16px);align-items:stretch}
+.maquina h3{margin:0;align-self:center;font-size:clamp(16px,1.3vw,21px);font-weight:800;line-height:1.1;max-width:9em}
+.estaciones{display:contents}
+.estacion{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.05);
+  border:2px solid transparent;transition:background .3s,border-color .3s}
+.estacion svg{flex:none;width:clamp(34px,2.8vw,46px);height:auto}
+.estacion svg circle{fill:var(--milpa2);stroke:var(--costal2);stroke-width:2.5}
+.estacion svg path{stroke:var(--costal2)}
+.estacion b{display:block;font-size:1em;line-height:1.1}
+.estacion span{display:block;color:var(--tenue);font-size:.8em;line-height:1.2}
+.estacion.on{background:rgba(242,182,50,.16);border-color:var(--maiz)}
+.estacion.on svg circle{fill:var(--maiz);stroke:var(--maiz)}
+.estacion.on svg path{stroke:var(--tinta-osc)}
+.estacion.hecho svg circle{stroke:var(--ok)}
+.estacion.hecho svg path{stroke:var(--ok)}
+
+.fiesta{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:20}
+.fiesta i{position:absolute;left:50%;top:40%;width:14px;height:14px;border-radius:40%;animation:cae 1.5s ease-out both}
+
+@keyframes pop{0%{transform:scale(.5)}100%{transform:scale(1)}}
+@keyframes llover{0%{top:0;opacity:0}20%{opacity:1}100%{top:34px;opacity:1}}
+@keyframes cae{0%{opacity:0;transform:translate(0,0) rotate(0)}12%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--r))}}
+
+/* pantallas medianas y verticales */
+@media (max-width:1100px){
+  .pasos li{padding:6px 10px 6px 6px;font-size:.9em}
+  .maquina{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .maquina h3{display:none}
+  .estacion span{display:none}
+}
+@media (max-width:900px), (orientation:portrait){
+  html,body{overflow:auto}
+  .app{height:auto;min-height:100dvh}
+  .pasos{display:none}
+  #vElegir,#vSeguir{grid-template-columns:1fr}
+  .costal svg.saco{max-height:30vh}
+  .vasosSel{max-height:28vh}
+  .rueda-caja{height:50vh}
+}
+@media (max-width:620px){
+  .costales{grid-template-columns:1fr}
+  .costal{flex-direction:row;flex-wrap:wrap;justify-content:center}
+  .costal svg.saco{width:40%;max-height:none}
+  .maquina{grid-template-columns:1fr 1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+
+/* ===== v2: todo crece con la pantalla (usa el ancho y el alto disponibles) ===== */
+body{font-size:clamp(15px,min(1.3vw,2.3vh),30px)}
+.app{padding:clamp(8px,1.2vh,20px) clamp(12px,1.6vw,40px) clamp(8px,1vh,16px);gap:clamp(8px,1.4vh,22px)}
+.marca b{font-size:clamp(24px,min(2.4vw,4.4vh),52px)}
+.marca svg{width:clamp(38px,min(3.4vw,6vh),70px)}
+.pasos li{font-size:1.05em;padding:6px 18px 6px 8px}
+.fs{width:clamp(44px,3vw,60px);height:clamp(44px,3vw,60px)}
+.con{font-size:.85em}
+
+/* elegir: costales más grandes y panel del lote más ancho */
+#vElegir{grid-template-columns:minmax(0,1fr) clamp(320px,30vw,620px);gap:clamp(12px,1.6vw,34px)}
+.elegir h1{font-size:clamp(28px,min(3.6vw,6.4vh),80px)}
+.elegir .bajada{font-size:1.1em;margin:2px 0 clamp(6px,1.2vh,18px)}
+.costales{gap:clamp(10px,1.4vw,30px)}
+.costal{padding:clamp(6px,1vh,16px) clamp(8px,.8vw,18px) clamp(10px,1.6vh,22px);border-radius:clamp(20px,1.6vw,34px)}
+.costal svg.saco{max-height:none;width:112%;margin:-2% -6% -1%}
+.costal h3{font-size:clamp(24px,min(2.6vw,4.6vh),58px)}
+.costal .dato{font-size:.95em;max-width:34ch;min-height:4em;margin:4px 0 12px}
+.ctl{gap:clamp(12px,1.2vw,26px)}
+.ctl button{width:clamp(58px,min(5.4vw,9.5vh),112px);height:clamp(58px,min(5.4vw,9.5vh),112px);font-size:clamp(32px,min(3vw,5.2vh),60px)}
+.ctl b{font-size:clamp(36px,min(3.6vw,6.4vh),80px)}
+.insignia{min-width:clamp(44px,3.2vw,64px);height:clamp(44px,3.2vw,64px);font-size:1.3em;top:14px;right:14px}
+
+.lote{padding:clamp(14px,1.6vw,30px)}
+.lote h2{font-size:clamp(26px,min(2.6vw,4.6vh),58px)}
+.ayuda{font-size:1.05em}
+.vasosSel{gap:clamp(8px,1vw,20px)}
+.vasoSel svg{max-width:none;width:100%;height:100%}
+.vasoSel small{font-size:.95em}
+.lista{font-size:1.05em}
+.lista i{width:.9em;height:.9em}
+.conf{min-height:clamp(66px,10vh,120px);font-size:clamp(22px,min(2vw,3.6vh),44px);border-radius:clamp(16px,1.4vw,26px)}
+
+/* seguimiento: rueda y vasos grandes */
+#vSeguir{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(12px,2vw,48px)}
+.seg{gap:clamp(12px,2.6vh,36px)}
+.seg h2{font-size:clamp(34px,min(4.4vw,8vh),104px)}
+#msg{font-size:clamp(22px,min(2.3vw,4.2vh),52px)}
+.segv{gap:clamp(16px,2.6vw,60px)}
+.copa svg{width:clamp(110px,min(11vw,26vh),280px)}
+.copa small{font-size:clamp(18px,min(1.7vw,3vh),38px)}
+.copa .est{font-size:.95em}
+.chorro{height:clamp(34px,5vh,60px);width:clamp(34px,3vw,56px)}
+.chorro i{width:clamp(9px,.8vw,15px);height:clamp(9px,.8vw,15px)}
+#otro{min-height:clamp(70px,10vh,120px);font-size:clamp(22px,min(2vw,3.6vh),44px)}
+
+/* pie */
+.maquina h3{font-size:clamp(16px,min(1.4vw,2.6vh),30px)}
+.estacion{padding:clamp(8px,1.2vh,18px) clamp(10px,1vw,20px);border-radius:clamp(14px,1.2vw,24px)}
+.estacion svg{width:clamp(34px,min(3vw,5.4vh),64px)}
+.estacion b{font-size:1.05em}
+.estacion span{font-size:.85em}
+
+@media (max-width:900px), (orientation:portrait){
+  .costal svg.saco{max-height:30vh;width:100%;margin:0}
+  .vasosSel{height:28vh}
+  .copa svg{width:clamp(90px,24vw,200px)}
+}
+@media (max-width:620px){ .costal svg.saco{width:40%} }
+
+/* ===== entrega con el carro AGV ===== */
+#ruta{width:100%;height:100%;max-height:100%}
+#ruta .almT rect{fill:#21483a;stroke:#cdb47f;stroke-width:3;transition:fill .3s,stroke .3s}
+#ruta .almT text{fill:#fbf6ea;font:800 14px var(--f)}
+#ruta .almT.dest rect{stroke:#f2b632;stroke-width:5}
+#ruta .almT.ok rect{fill:#2c5b49;stroke:#6cc08b;stroke-width:5}
+#ruta .almT .chk{opacity:0;transition:opacity .3s}
+#ruta .almT.ok .chk{opacity:1}
+#ruta .lbl{fill:#b9cbbf;font:700 15px var(--f)}
+
+/* la columna de seguimiento siempre cabe en la pantalla */
+#vSeguir{align-items:stretch}
+.seg{height:100%;justify-content:safe center;gap:clamp(8px,1.8vh,26px)}
+.copa svg{width:clamp(96px,min(10vw,21vh),240px)}
+#otro{min-height:clamp(60px,8vh,100px)}
+.seg h2{font-size:clamp(32px,min(4.2vw,7.4vh),96px)}
+
+/* ===== el carro no está en carga: no se puede pedir todavía ===== */
+.aviso{display:flex;align-items:center;gap:12px;margin:0 0 clamp(8px,1.2vh,16px);padding:12px 18px;border-radius:16px;
+  background:rgba(242,182,50,.16);border:2px solid var(--maiz);color:var(--tinta);font-weight:700;font-size:1.05em}
+.aviso::before{content:"";flex:none;width:12px;height:12px;border-radius:50%;background:var(--maiz);animation:parpadeo 1.2s ease-in-out infinite}
+@keyframes parpadeo{50%{opacity:.25}}
+#otro:disabled{opacity:.6;cursor:default;box-shadow:none;transform:none}
+
+/* ===== v7: mismos colores que el HMI y el carro — negro con dorado ===== */
+:root{
+  --milpa:#0c0f14; --milpa2:#161b23; --milpa3:#232b38;
+  --tinta:#eef2f7; --tenue:#98a3b3; --tinta-osc:#171207;
+  --maiz:#e6b84a; --maiz-osc:#9a7419; --oro1:#f6d77c; --oro2:#c9962c;
+  --ok:#33c469; --mal:#ff6b6b;
+  --borde:#2c3544;
+}
+body{background:
+    radial-gradient(1100px 620px at 78% -12%,rgba(230,184,74,.10) 0,transparent 60%),
+    radial-gradient(1200px 600px at 10% -10%,#18202c 0%,transparent 60%),
+    var(--milpa)}
+.top{padding-bottom:clamp(6px,1vh,14px);border-bottom:1px solid var(--borde)}
+.marca b{background:linear-gradient(180deg,var(--oro1),var(--oro2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.pasos li{background:var(--milpa2);border:1px solid var(--borde)}
+.pasos li::before{background:var(--milpa3);color:var(--tenue)}
+.pasos li.on{background:linear-gradient(180deg,var(--oro1),var(--oro2));border-color:var(--maiz);color:var(--tinta-osc);box-shadow:0 4px 16px rgba(230,184,74,.25)}
+.pasos li.on::before{background:var(--tinta-osc);color:var(--maiz)}
+.pasos li.hecho{color:var(--maiz);border-color:rgba(230,184,74,.45)}
+.pasos li.hecho::before{background:var(--maiz);color:var(--tinta-osc)}
+.con{background:var(--milpa2);border:1px solid var(--borde)}
+.con.on{background:rgba(51,196,105,.12);border-color:rgba(51,196,105,.5);color:#7fe0a4}
+.fs{background:var(--milpa2);border:1px solid var(--borde)}
+.fs:hover{border-color:var(--maiz)}
+
+.elegir h1,.seg h2{color:var(--tinta)}
+.elegir h1::after{content:"";display:block;width:clamp(60px,6vw,120px);height:4px;margin-top:8px;border-radius:4px;background:linear-gradient(90deg,var(--oro1),var(--oro2))}
+.costal{background:linear-gradient(180deg,#1a2029,#12161d);border:2px solid var(--borde);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.costal.tiene{border-color:var(--maiz);background:linear-gradient(180deg,rgba(230,184,74,.13),#12161d 70%);box-shadow:0 0 0 1px rgba(230,184,74,.35),0 10px 34px rgba(230,184,74,.12)}
+.costal h3{color:var(--tinta)}
+.ctl button{background:var(--milpa3);border:1px solid var(--borde);color:var(--tinta);box-shadow:inset 0 -4px 0 rgba(0,0,0,.35)}
+.ctl button.mas{background:linear-gradient(180deg,var(--oro1),var(--oro2));border-color:var(--maiz);color:var(--tinta-osc)}
+.ctl b{color:var(--maiz)}
+.insignia{background:linear-gradient(180deg,var(--oro1),var(--oro2));color:var(--tinta-osc)}
+
+/* panel del lote: negro con marco dorado */
+.lote{background:linear-gradient(180deg,#1a2029,#11151b);color:var(--tinta);border:2px solid var(--maiz);
+  box-shadow:0 0 0 1px rgba(0,0,0,.6),0 14px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.04)}
+.lote::after{border:1px dashed rgba(230,184,74,.35)}
+.lote h2{color:var(--maiz)}
+.ayuda,.vasoSel small,.lista .vacio{color:var(--tenue)}
+.conf{background:var(--milpa3);color:var(--tenue);box-shadow:0 5px 0 #05070a}
+.conf:not(:disabled){background:linear-gradient(180deg,var(--oro1),var(--oro2));color:var(--tinta-osc);box-shadow:0 5px 0 var(--maiz-osc),0 8px 24px rgba(230,184,74,.25)}
+.conf:active:not(:disabled){box-shadow:0 1px 0 var(--maiz-osc)}
+
+/* seguimiento */
+.st circle{fill:var(--milpa2);stroke:#3b4659}
+.st path{stroke:var(--tenue)}
+.st.on circle{fill:var(--maiz);stroke:var(--oro1)}
+#msg.bien{color:#7fe0a4}
+.copa .est{color:var(--tenue)}
+#otro{background:linear-gradient(180deg,var(--oro1),var(--oro2));color:var(--tinta-osc);box-shadow:0 5px 0 var(--maiz-osc),0 8px 24px rgba(230,184,74,.25)}
+#otro:disabled{background:var(--milpa3);color:var(--maiz);border:2px solid var(--maiz);box-shadow:none}
+
+/* mapa del carro */
+#ruta .almT rect{fill:var(--milpa2);stroke:#3b4659}
+#ruta .almT text{fill:var(--tinta)}
+#ruta .almT.dest rect{stroke:var(--maiz)}
+#ruta .almT.ok rect{fill:rgba(51,196,105,.15);stroke:var(--ok)}
+#ruta .lbl{fill:var(--tenue)}
+
+/* pie */
+.maquina h3{color:var(--maiz)}
+.estacion{background:var(--milpa2);border:2px solid var(--borde)}
+.estacion svg circle{fill:var(--milpa3);stroke:#3b4659}
+.estacion svg path{stroke:var(--tenue)}
+.estacion.on{background:rgba(230,184,74,.12);border-color:var(--maiz)}
+.estacion.on svg circle{fill:var(--maiz);stroke:var(--maiz)}
+
+.aviso{background:rgba(230,184,74,.10);border-color:var(--maiz);color:var(--tinta)}
+
+/* ===== v9: vaso rechazado en Verificación y su reposición ===== */
+.copa{position:relative}
+.copa .veces{position:absolute;top:-4px;right:-6px;z-index:2;padding:2px 9px;border-radius:999px;font-weight:800;font-size:.7em;
+  background:var(--maiz);color:var(--tinta-osc);visibility:hidden}
+.copa.re .veces:not(:empty){visibility:visible}
+.copa.rech{opacity:1;animation:sacude .5s ease-in-out}
+.copa.rech svg{filter:grayscale(.75) brightness(.7)}
+.copa.rech .nivel{transform:scaleY(1)}
+.copa.rech .chk{opacity:0}
+.copa.rech::after{content:"✕";position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);width:1.9em;height:1.9em;border-radius:50%;
+  display:grid;place-items:center;background:var(--mal);color:#fff;font-weight:800;font-size:clamp(22px,2.4vw,44px);box-shadow:0 0 0 6px rgba(255,107,107,.25)}
+.copa.rech .est{color:var(--mal);font-weight:800}
+.copa.rech small{color:var(--mal)}
+.copa.re.sirv .est,.copa.re.esp .est{color:var(--maiz);font-weight:800}
+@keyframes sacude{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="marca">
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M24 44V20" stroke="#f2b632" stroke-width="3" stroke-linecap="round"/>
+        <path d="M24 30c-9 0-14-6-14-14 9 0 14 6 14 14zM24 24c8 0 13-5 13-12-8 0-13 5-13 12z" fill="#6cc08b"/>
+        <ellipse cx="24" cy="10" rx="4" ry="6" fill="#f2b632"/>
+      </svg>
+      <div><b>La Cosecha</b><span>Granos y semillas</span></div>
+    </div>
+    <ol class="pasos" id="pasos" aria-label="Pasos">
+      <li class="on">Elige</li><li>Confirma</li><li>Preparación</li><li>Entrega</li>
+    </ol>
+    <div class="der">
+      <span id="con" class="con">Conectando…</span>
+      <button id="fs" class="fs" type="button" aria-label="Pantalla completa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1 · ELEGIR -->
+    <section class="vista" id="vElegir">
+      <div class="elegir">
+        <h1>Arma tu lote de 3 porciones</h1>
+        <p class="bajada">Cada porción se sirve en su propio vaso. Puedes repetir grano.</p>
+        <p class="aviso" id="aviso" role="status" hidden></p>
+        <div class="costales" id="costales"></div>
+      </div>
+      <aside class="lote" aria-label="Tu lote">
+        <h2>Tu lote</h2>
+        <p class="ayuda" id="ayuda" aria-live="polite"></p>
+        <div class="vasosSel" id="vasosSel"></div>
+        <ul class="lista" id="lista"></ul>
+        <button id="conf" class="conf" type="button" disabled>Confirmar pedido</button>
+      </aside>
+    </section>
+
+    <!-- 2 · SEGUIMIENTO -->
+    <section class="vista" id="vSeguir" hidden>
+      <div class="rueda-caja">
+        <svg id="rueda" viewBox="0 0 400 400" role="img" aria-label="Rueda de la máquina con las 4 estaciones">
+          <defs>
+            <radialGradient id="disco" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#232b38"/><stop offset="1" stop-color="#0c0f14"/></radialGradient>
+          </defs>
+          <circle cx="200" cy="200" r="168" fill="none" stroke="#cdb47f" stroke-width="2" stroke-dasharray="3 9" opacity=".6"/>
+          <circle cx="200" cy="200" r="150" fill="url(#disco)" stroke="#8f7443" stroke-width="3"/>
+          <circle cx="200" cy="200" r="98" fill="none" stroke="#cdb47f" stroke-width="1.5" opacity=".25"/>
+          <rect x="190" y="70" width="20" height="260" rx="10" fill="#cdb47f" opacity=".12"/>
+          <circle cx="200" cy="200" r="22" fill="#e2cfa3" stroke="#8f7443" stroke-width="3"/>
+          <circle cx="200" cy="200" r="6" fill="#3a2a17"/>
+          <!-- estaciones fijas: Entrada (izq), Llenado (arriba), Tapado (der), Verificación (abajo) -->
+          <g class="st" id="st0"><circle cx="50" cy="200" r="24"/><path d="M38 200h22m-7-7 7 7-7 7" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><text x="50" y="246" text-anchor="middle">Entrada</text></g>
+          <g class="st" id="st1"><circle cx="200" cy="50" r="24"/><path d="M200 38v14m-6-5 6 6 6-6M191 60h18" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><text x="200" y="16" text-anchor="middle">Llenado</text></g>
+          <g class="st" id="st2"><circle cx="350" cy="200" r="24"/><path d="M338 196h24M343 196v-5h14v5M341 205h18" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><text x="350" y="246" text-anchor="middle">Tapado</text></g>
+          <g class="st" id="st3"><circle cx="200" cy="350" r="24"/><path d="M189 350l7 7 14-14" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><text x="200" y="394" text-anchor="middle">Verificación</text></g>
+          <!-- tu vaso: gira con la rueda -->
+          <g id="marcador" style="transform:rotate(-90deg)" opacity="0">
+            <circle cx="200" cy="104" r="30" fill="#0c0f14" stroke="#e6b84a" stroke-width="3"/>
+            <path d="M188 92h24l-3 26h-18z" fill="#e2cfa3" stroke="#3a2a17" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M189.5 104h21l-1.6 14h-17.8z" fill="#f2b632"/>
+          </g>
+        </svg>
+        <svg id="ruta" viewBox="0 0 400 400" role="img" aria-label="Recorrido del carro AGV hacia el almacén" hidden>
+          <path id="rutaLinea" d="M 70 250 L 70 300 Q 70 340 110 340 L 260 340 Q 300 340 300 300 L 300 120 Q 300 80 260 80 L 110 80 Q 70 80 70 120 Z" fill="none" stroke="#0c1d15" stroke-width="13" stroke-linejoin="round"/>
+          <path d="M 70 250 L 70 300 Q 70 340 110 340 L 260 340 Q 300 340 300 300 L 300 120 Q 300 80 260 80 L 110 80 Q 70 80 70 120 Z" fill="none" stroke="#cdb47f" stroke-width="1.5" stroke-dasharray="6 8" opacity=".5"/>
+          <text class="lbl" x="6" y="244">Carga</text>
+          <g transform="translate(98 352)"><rect width="34" height="34" rx="3" fill="#fbf6ea"/><path d="M4 4h9v9H4zM21 4h9v9h-9zM4 21h9v9H4zM18 18h4v4h-4zM24 22h6v4h-6zM18 26h4v4h-4z" fill="#173326"/></g>
+          <text class="lbl" x="115" y="400" text-anchor="middle" font-size="13">Lector QR</text>
+          <g class="almT" id="almT1"><rect x="160" y="356" width="84" height="38" rx="6"/><text x="202" y="381" text-anchor="middle">Almacén 1</text><path class="chk" d="M250 368l7 7 13-14" fill="none" stroke="#6cc08b" stroke-width="5" stroke-linecap="round"/></g>
+          <g class="almT" id="almT2"><rect x="312" y="170" width="86" height="38" rx="6"/><text x="355" y="195" text-anchor="middle">Almacén 2</text><path class="chk" d="M346 220l7 7 13-14" fill="none" stroke="#6cc08b" stroke-width="5" stroke-linecap="round"/></g>
+          <g class="almT" id="almT3"><rect x="143" y="14" width="84" height="38" rx="6"/><text x="185" y="39" text-anchor="middle">Almacén 3</text><path class="chk" d="M233 26l7 7 13-14" fill="none" stroke="#6cc08b" stroke-width="5" stroke-linecap="round"/></g>
+          <g id="carroT">
+            <rect x="-20" y="-14" width="40" height="28" rx="6" fill="#e2cfa3" stroke="#3a2a17" stroke-width="2.5"/>
+            <circle cx="-8" cy="-4" r="4.5" fill="#5a2a3c"/><circle cx="3" cy="-4" r="4.5" fill="#f2b632"/><circle cx="-3" cy="6" r="4.5" fill="#c47a35"/>
+            <rect x="12" y="-5" width="5" height="10" rx="1.5" fill="#173326"/>
+          </g>
+        </svg>
+      </div>
+      <div class="seg">
+        <h2 id="segT">Preparando tu pedido</h2>
+        <p id="msg" aria-live="polite">Enviando tu pedido…</p>
+        <div class="segv" id="segV"></div>
+        <button id="otro" type="button" hidden>Hacer otro pedido</button>
+        <p class="cuenta-atras" id="cuenta" hidden></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="maquina">
+    <h3>Así se prepara tu pedido</h3>
+    <ol class="estaciones" style="list-style:none;margin:0;padding:0">
+      <li class="estacion" id="pie0"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M13 24h22m-7-7 7 7-7 7" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Entrada</b><span>Tu vaso entra a la rueda.</span></div></li>
+      <li class="estacion" id="pie1"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M24 12v15m-6-6 6 6 6-6M15 35h18" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Llenado</b><span>El dispensador sirve tu grano.</span></div></li>
+      <li class="estacion" id="pie2"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M12 21h24M17 21v-5h14v5M15 30h18" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Tapado</b><span>La máquina le pone la tapa.</span></div></li>
+      <li class="estacion" id="pie3"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M14 24l7 7 14-14" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Verificación</b><span>Un sensor revisa la tapa. Si falla, se sirve de nuevo.</span></div></li>
+      <li class="estacion" id="pie4"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path d="M12 19h17v11H12zM29 23h5l3 4v3h-8M16 34a2.5 2.5 0 1 0 0-.1M32 34a2.5 2.5 0 1 0 0-.1" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Entrega</b><span>Un carro AGV sigue la línea y lleva tu lote al almacén.</span></div></li>
+    </ol>
+  </footer>
+</div>
+
+<script>
+/* ===== Configuración ===== */
+// Mismo orden que las tolvas del HMI (tolva 1, 2 y 3).
+const GRANOS = [
+  { n: "Frijol",   c: "#5a2a3c", k: "#2b1420", h: "#8a4a62", forma: "frijol",
+    dato: "Rico en proteína y fibra. En México se cultiva desde hace miles de años." },
+  { n: "Lentejas", c: "#c47a35", k: "#8a4f1d", h: "#e3a768", forma: "lenteja",
+    dato: "Tiene mucho hierro y se cuece sin remojarla antes." },
+  { n: "Maíz",     c: "#f2b632", k: "#c98a0e", h: "#ffdd7a", forma: "maiz",
+    dato: "Es la base de la tortilla. México tiene más de 50 razas nativas de maíz." }
+];
+const LOTE = 3;
+// Vacío = se calcula solo desde la dirección de la página.
+const WS_URL = "";
+// true = si no hay servidor, simula el pedido (para probar el diseño). Ponlo en false para uso real.
+/* La demostración (todo inventado, sin máquina) SOLO se activa a propósito abriendo la tienda con ?demo=1.
+   Sin servidor la tienda NO deja pedir: así nunca muestra un pedido que la rueda no está haciendo. */
+const PERMITIR_DEMO = new URLSearchParams(location.search).get("demo") === "1";
+const ESPERA_REINICIO = 12000;   // ms que se ve el "gracias" antes de volver a pedir solo
+
+/* ===== Estado ===== */
+const $ = id => document.getElementById(id);
+const q = [0, 0, 0];
+let pedido = null;               // { id, vs:["pend"|"esp"|"sirv"|"hecho"], fin:boolean }
+let ws = null, enLinea = false, hmiOn = true, tReinicio = null, tCuenta = null;
+let disp = { pedir: true, msg: "", agv: "" };   // lo avisa el HMI: ¿el carro está en la posición de carga?
+let esperandoCarro = false;
+const total = () => q[0] + q[1] + q[2];
+const vibra = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} };
+function reanimar(el, clase) { el.classList.remove(clase); void el.offsetWidth; el.classList.add(clase); }
+
+/* números pseudoaleatorios con semilla: los granos siempre quedan en el mismo lugar */
+function azar(sem) { let s = sem; return () => (s = (s * 9301 + 49297) % 233280) / 233280; }
+
+/* ===== Dibujos ===== */
+function granoSvg(g, x, y, rot) {
+  const f = g.forma;
+  const rx = f === "frijol" ? 7.5 : f === "lenteja" ? 5.6 : 5.2;
+  const ry = f === "frijol" ? 4.6 : f === "lenteja" ? 4.8 : 6.8;
+  return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx}" ry="${ry}" transform="rotate(${rot.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="url(#gr-${f})" stroke="${g.k}" stroke-width=".8"/>`;
+}
+function defsGranos() {
+  return GRANOS.map(g => `<radialGradient id="gr-${g.forma}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="${g.h}"/><stop offset=".55" stop-color="${g.c}"/><stop offset="1" stop-color="${g.k}"/></radialGradient>`).join("");
+}
+function sacoSvg(i) {
+  const g = GRANOS[i], r = azar(17 + i * 101);
+  let granos = "";
+  for (let k = 0; k < 70; k++) {                     // montón de granos en la boca del costal
+    const t = r(), x = 48 + r() * 104, tope = 64 - 34 * Math.sin(Math.PI * (x - 46) / 108);
+    const y = tope + t * (70 - tope);
+    granos += granoSvg(g, x, y, r() * 180);
+  }
+  return `<svg class="saco" viewBox="0 0 200 230" aria-hidden="true">
+    <defs>${defsGranos()}
+      <linearGradient id="tela${i}" x1="0" x2="1"><stop offset="0" stop-color="#cdb47f"/><stop offset=".35" stop-color="#e2cfa3"/><stop offset=".7" stop-color="#e2cfa3"/><stop offset="1" stop-color="#b89a62"/></linearGradient>
+      <pattern id="trama${i}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 3h6M3 0v6" stroke="#8f7443" stroke-width=".6" opacity=".35"/></pattern>
+      <clipPath id="boca${i}"><path d="M44 72 Q100 6 156 72 Z"/></clipPath>
+    </defs>
+    <ellipse cx="100" cy="216" rx="70" ry="9" fill="#000" opacity=".25"/>
+    <path d="M42 74 Q28 130 34 184 Q38 212 100 214 Q162 212 166 184 Q172 130 158 74 Z" fill="url(#tela${i})" stroke="#8f7443" stroke-width="2.5"/>
+    <path d="M42 74 Q28 130 34 184 Q38 212 100 214 Q162 212 166 184 Q172 130 158 74 Z" fill="url(#trama${i})"/>
+    <path d="M47 84 Q35 134 40 182 Q44 205 100 207 Q156 205 160 182 Q165 134 153 84" fill="none" stroke="#8f7443" stroke-width="1.8" stroke-dasharray="5 4" opacity=".7"/>
+    <g clip-path="url(#boca${i})"><path d="M44 72 Q100 6 156 72 Z" fill="${g.k}"/>${granos}</g>
+    <path d="M38 70 Q100 56 162 70 L164 82 Q100 94 36 82 Z" fill="#cdb47f" stroke="#8f7443" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M44 76 Q100 66 156 76" fill="none" stroke="#8f7443" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <text x="100" y="152" text-anchor="middle" font-family="Baloo 2, Trebuchet MS, sans-serif" font-weight="800" font-size="30" fill="#8f7443" opacity=".75" letter-spacing="2">${String(i + 1).padStart(2, "0")}</text>
+    <text x="100" y="176" text-anchor="middle" font-family="Baloo 2, Trebuchet MS, sans-serif" font-weight="700" font-size="13" fill="#8f7443" opacity=".75">TOLVA</text>
+  </svg>`;
+}
+/* vaso: si lleva grano, se dibuja relleno con textura de ese grano */
+function vasoSvg(g, id, conCheck) {
+  const r = azar(id * 37 + 5);
+  let granos = "";
+  if (g) for (let k = 0; k < 26; k++) granos += granoSvg(g, 16 + r() * 48, 30 + r() * 64, r() * 180);
+  return `<svg viewBox="0 0 80 110" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <defs>${g ? defsGranos() : ""}<clipPath id="cv${id}"><path d="M10 12h60l-8 86H18z"/></clipPath></defs>
+    <path d="M10 12h60l-8 86H18z" fill="${g ? "rgba(255,255,255,.18)" : "rgba(58,42,23,.06)"}" stroke="${g ? "#3a2a17" : "#8f7443"}" stroke-width="2.5" ${g ? "" : 'stroke-dasharray="5 4"'} stroke-linejoin="round"/>
+    ${g ? `<g clip-path="url(#cv${id})"><g class="nivel"><rect x="0" y="26" width="80" height="80" fill="${g.c}"/>${granos}</g></g>` : ""}
+    <path d="M7 12h66" stroke="${g ? "#3a2a17" : "#8f7443"}" stroke-width="3" stroke-linecap="round"/>
+    ${conCheck ? `<path class="chk" d="M26 58l10 10 19-20" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>` : ""}
+  </svg>`;
+}
+
+/* ===== Construcción ===== */
+function construir() {
+  GRANOS.forEach((g, i) => {
+    $("costales").insertAdjacentHTML("beforeend",
+      `<article class="costal" id="cd${i}">
+         <span class="insignia" id="ins${i}"></span>
+         ${sacoSvg(i)}
+         <h3>${g.n}</h3>
+         <p class="dato">${g.dato}</p>
+         <div class="ctl">
+           <button type="button" id="m${i}" aria-label="Quitar una porción de ${g.n}">−</button>
+           <b id="q${i}" aria-live="polite">0</b>
+           <button type="button" class="mas" id="p${i}" aria-label="Agregar una porción de ${g.n}">+</button>
+         </div>
+       </article>`);
+    $("m" + i).onclick = () => cambiar(i, -1);
+    $("p" + i).onclick = () => cambiar(i, 1);
+  });
+  $("conf").onclick = pedir;
+  $("otro").onclick = reiniciar;
+  $("fs").onclick = () => {
+    try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (_) {}
+  };
+}
+
+/* ===== Selección ===== */
+function cambiar(i, d) {
+  if (pedido || (d > 0 && total() >= LOTE) || (d < 0 && q[i] === 0)) return;
+  q[i] += d; vibra();
+  reanimar($("q" + i), "pop");
+  pintar();
+}
+function secuencia() {                      // tolva de cada vaso, en el orden en que se dosifica
+  const s = []; q.forEach((n, i) => { for (let k = 0; k < n; k++) s.push(i); }); return s;
+}
+let vasosPrevios = null;
+function pintar() {
+  const t = total(), sinServ = !enLinea && !PERMITIR_DEMO, sinHmi = sinServ || (enLinea && !hmiOn), sinCarro = !disp.pedir;
+  $("aviso").hidden = !sinCarro || !!pedido; $("aviso").textContent = disp.msg || "El carro de entrega está ocupado. Espera un momento.";
+  GRANOS.forEach((g, i) => {
+    $("q" + i).textContent = q[i];
+    $("m" + i).disabled = q[i] === 0;
+    $("p" + i).disabled = t >= LOTE;
+    $("cd" + i).classList.toggle("tiene", q[i] > 0);
+    $("ins" + i).textContent = "×" + q[i];
+  });
+  // vasos del lote: se llenan conforme eliges
+  const seq = secuencia(), firma = seq.join(",");
+  if (firma !== vasosPrevios) {
+    vasosPrevios = firma;
+    $("vasosSel").innerHTML = Array.from({ length: LOTE }, (_, k) => {
+      const g = seq[k] !== undefined ? GRANOS[seq[k]] : null;
+      return `<div class="vasoSel">${vasoSvg(g, 100 + k, false)}<small>${g ? g.n : "Vaso " + (k + 1)}</small></div>`;
+    }).join("");
+    const ult = $("vasosSel").children[seq.length - 1];
+    if (ult) { const n = ult.querySelector(".nivel"); if (n) n.animate([{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 550, easing: "cubic-bezier(.3,1.3,.5,1)" }); }
+  }
+  $("lista").innerHTML = t
+    ? GRANOS.map((g, i) => q[i] ? `<li style="--c:${g.c}"><i></i>${q[i]} ${q[i] === 1 ? "porción" : "porciones"} de ${g.n}</li>` : "").join("")
+    : `<li class="vacio">Todavía no eliges nada.</li>`;
+  const falta = LOTE - t;
+  $("ayuda").textContent = sinServ ? "Sin conexión con el servidor. Abre la tienda con la dirección que muestra la terminal (npm start)."
+    : sinHmi ? "El dispensador no está disponible por ahora. Avisa al encargado."
+    : t === 0 ? "Toca + en un costal para servir tu primer vaso."
+    : falta > 0 ? `Te ${falta === 1 ? "falta 1 vaso" : `faltan ${falta} vasos`} para completar el lote.`
+    : sinCarro ? "Tu lote está listo. Podrás confirmarlo cuando el carro regrese a la posición de carga."
+    : "¡Lote completo! Revisa y confirma tu pedido.";
+  $("conf").disabled = t !== LOTE || sinHmi || sinCarro;
+  if (!pedido) marcarPaso(t === LOTE ? 1 : 0);   // con pedido en curso, los pasos los marca su avance
+}
+function marcarPaso(n) {
+  [...$("pasos").children].forEach((li, k) => { li.className = k < n ? "hecho" : k === n ? "on" : ""; });
+}
+function conexion(on, txt, verde = on) { enLinea = on; const c = $("con"); c.textContent = txt; c.className = "con" + (verde ? " on" : ""); }
+function etiqueta() { conexion(true, hmiOn ? "En línea con el dispensador" : "Dispensador apagado", hmiOn); }
+function pantalla(n) {
+  $("vElegir").hidden = n !== 0;
+  $("vSeguir").hidden = n !== 1;
+  if (n === 0) { estacion(-1); mostrarRuta(false); }
+}
+
+/* ===== Entrega: el carro AGV sigue la línea hasta el almacén ===== */
+const RUTA = { s: 0, meta: 0, L: 0, paradas: {}, anim: null };
+function prepararRuta() {
+  const p = $("rutaLinea"); RUTA.L = p.getTotalLength();
+  const PTS = { carga: [70, 250], a1: [202, 340], a2: [300, 189], a3: [185, 80] };
+  Object.entries(PTS).forEach(([k, [x, y]]) => {
+    let mejor = 0, d0 = Infinity;
+    for (let s = 0; s <= RUTA.L; s += 2) { const q = p.getPointAtLength(s), d = (q.x - x) ** 2 + (q.y - y) ** 2; if (d < d0) { d0 = d; mejor = s; } }
+    RUTA.paradas[k] = mejor;
+  });
+  RUTA.paradas.carga = 0; dibujarCarroT();
+}
+function dibujarCarroT() {
+  const p = $("rutaLinea"), s = RUTA.s % RUTA.L, a = p.getPointAtLength(s), b = p.getPointAtLength((s + 2) % RUTA.L);
+  const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+  $("carroT").setAttribute("transform", `translate(${a.x.toFixed(1)} ${a.y.toFixed(1)}) rotate(${ang.toFixed(1)})`);
+}
+function rutaIr(k) {                       // avanza siguiendo la línea (solo hacia adelante)
+  RUTA.meta = k === "vuelta" ? RUTA.L - 1 : (RUTA.paradas[k] ?? 0);
+  if (RUTA.anim) return;
+  let t0 = performance.now();
+  const paso = (t) => {
+    const dt = Math.min(0.1, (t - t0) / 1000); t0 = t;
+    RUTA.s = Math.min(RUTA.meta, RUTA.s + 120 * dt);
+    dibujarCarroT();
+    RUTA.anim = RUTA.s < RUTA.meta ? requestAnimationFrame(paso) : null;
+  };
+  RUTA.anim = requestAnimationFrame(paso);
+}
+function rutaDestino(d, ok) {
+  for (let n = 1; n <= 3; n++) {
+    $("almT" + n).classList.toggle("dest", n === d && !ok);
+    $("almT" + n).classList.toggle("ok", n === d && !!ok);
+  }
+}
+function mostrarRuta(on) {
+  $("rueda").toggleAttribute("hidden", on); $("ruta").toggleAttribute("hidden", !on);   // en SVG se usa el atributo
+  if (!on) { if (RUTA.anim) cancelAnimationFrame(RUTA.anim); RUTA.anim = null; RUTA.s = 0; RUTA.meta = 0; rutaDestino(0); }
+  if (on && !RUTA.L) prepararRuta();
+  if (on) dibujarCarroT();
+}
+
+/* ===== Rueda: dónde va tu vaso ===== */
+let angulo = -90;
+const ANG = [-90, 0, 90, 180];                 // Entrada, Llenado, Tapado, Verificación
+function estacion(k, terminado) {
+  const m = $("marcador");
+  if (k >= 0 && k <= 3) {                       // la rueda solo gira hacia adelante
+    const delta = ((ANG[k] - angulo) % 360 + 360) % 360;
+    angulo += delta;
+    m.style.transform = `rotate(${angulo}deg)`;
+    m.setAttribute("opacity", "1");
+  } else m.setAttribute("opacity", "0");
+  for (let s = 0; s < 5; s++) {
+    const on = s === k && !terminado, hecho = terminado ? s <= k : (k >= 0 && s < k);
+    const r = $("st" + s);
+    if (r) { r.classList.toggle("on", on); r.classList.toggle("hecho", hecho); }
+    $("pie" + s).classList.toggle("on", on); $("pie" + s).classList.toggle("hecho", hecho);
+  }
+}
+
+/* ===== Pedido ===== */
+function pedir() {
+  if (total() !== LOTE || pedido) return;
+  vibra();
+  pedido = { id: "P" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), vs: ["pend", "pend", "pend"], fin: false, gr: secuencia(), re: {} };
+  $("segV").innerHTML = secuencia().map((g, k) =>
+    `<div class="copa pend" style="--c:${GRANOS[g].c}"><div class="chorro"><i></i><i></i><i></i></div>
+       <span class="veces"></span>${vasoSvg(GRANOS[g], 200 + k, true)}<small>${GRANOS[g].n}</small><span class="est">En espera</span></div>`).join("");
+  $("segT").textContent = "Preparando tu pedido"; $("otro").hidden = true; $("cuenta").hidden = true;
+  mensaje("Enviando tu pedido…");
+  pantalla(1); estacion(-1); marcarPaso(2);
+  const id = pedido.id, p = [...q];
+  setTimeout(() => enviar({ tipo: "pedido", id, p }), 800);       // p = porciones de la tolva 1, 2 y 3
+}
+/* pedido entregado, pero el carro aún no vuelve a carga: se espera antes de dejar pedir otro */
+function esperarCarro() {
+  esperandoCarro = true;
+  clearTimeout(tReinicio); clearInterval(tCuenta);
+  $("otro").hidden = false; $("otro").disabled = true; $("otro").textContent = "El carro regresa a carga…";
+  $("cuenta").hidden = false; $("cuenta").textContent = "Podrás hacer otro pedido cuando el carro regrese a la posición de carga.";
+}
+function actualizarDisp() {
+  pintar();
+  if (!esperandoCarro) return;
+  if (disp.agv === "REGRESANDO") rutaIr("vuelta");
+  if (disp.pedir) {
+    esperandoCarro = false;
+    if (RUTA.anim) { cancelAnimationFrame(RUTA.anim); RUTA.anim = null; }
+    RUTA.s = 0; RUTA.meta = 0; if (RUTA.L) dibujarCarroT();
+    mensaje("El carro ya está en la posición de carga. ¡Puedes hacer otro pedido!", "bien");
+    terminar(ESPERA_REINICIO / 1000);
+  }
+}
+function reiniciar() {
+  if (esperandoCarro) return;                    // aún no se puede pedir otro lote
+  clearTimeout(tReinicio); clearInterval(tCuenta); tReinicio = null;
+  pedido = null; q.fill(0); vasosPrevios = "-"; pantalla(0); pintar();
+}
+function mensaje(txt, clase) { const m = $("msg"); m.textContent = txt; m.className = clase || ""; }
+const TEXTO_VASO = { pend: "En espera", esp: "Colocando vaso", sirv: "Sirviendo…", hecho: "Servido", rech: "Rechazado · se sirve de nuevo" };
+const TEXTO_REPO = { esp: "Colocando vaso nuevo", sirv: "Sirviendo de nuevo…", hecho: "Servido de nuevo" };
+function pintarSeg() {
+  [...$("segV").children].forEach((c, k) => {
+    const e = pedido.vs[k], re = pedido.re && pedido.re[k];
+    c.className = "copa " + e + (re ? " re" : "");
+    c.querySelector(".est").textContent = (re && TEXTO_REPO[e]) || TEXTO_VASO[e];
+    const n = c.querySelector(".veces"); if (n) n.textContent = re ? `${re + 1}ª vez` : "";
+  });
+}
+/* ---- vasos rechazados en Verificación y su reposición ----
+   El HMI avisa el rechazo con el grano; la reposición llega con repo:true y se acomoda en el vaso de ese grano. */
+function vasoRechazado(grano) {
+  const g = grano - 1, gr = pedido.gr || [];
+  let k = -1;
+  for (let j = gr.length - 1; j >= 0; j--) if (gr[j] === g && pedido.vs[j] === "hecho") { k = j; break; }
+  if (k < 0) k = gr.findIndex((x, j) => x === g && pedido.vs[j] !== "rech");
+  if (k < 0) return;
+  pedido.vs[k] = "rech"; pedido.re = pedido.re || {}; pedido.re[k] = (pedido.re[k] || 0);
+}
+function vasoRepo(m) {
+  const gr = pedido.gr || [], vs = pedido.vs;
+  const buscar = (estados, g) => vs.findIndex((e, j) => estados.includes(e) && (g == null || gr[j] === g));
+  if (m.fase === "esperando_vaso") {
+    if (buscar(["esp", "sirv"]) < 0) { const k = buscar(["rech"]); if (k >= 0) vs[k] = "esp"; }
+  } else if (m.fase === "sirviendo") {
+    const g = (m.grano || 1) - 1;
+    let k = buscar(["esp"], g); if (k < 0) k = buscar(["rech"], g);
+    const otro = buscar(["esp"]); if (otro >= 0 && otro !== k) vs[otro] = "rech";
+    if (k >= 0) { vs[k] = "sirv"; pedido.re[k] = (pedido.re[k] || 0) + 1; }
+    $("segT").textContent = "Reponiendo tu vaso"; estacion(1);
+    mensaje(`Sirviendo de nuevo ${GRANOS[g] ? GRANOS[g].n : ""}…`);
+  } else if (m.fase === "vaso_listo") {
+    const k = buscar(["sirv"]); if (k >= 0) vs[k] = "hecho";
+    estacion(2); mensaje("Vaso repuesto. Ahora se tapa y se vuelve a revisar.");
+  } else if (m.fase === "pausa") {
+    mensaje(m.msg || "Revisando el vaso repuesto…");
+  } else if (m.fase === "retirar") mensaje(m.msg || "Retira el vaso repuesto.");
+}
+function terminar(segundos) {
+  $("otro").hidden = false; $("cuenta").hidden = false;
+  $("otro").disabled = false; $("otro").textContent = "Hacer otro pedido";
+  let s = segundos;
+  const pon = () => { $("cuenta").textContent = `La pantalla vuelve al inicio en ${s} s.`; };
+  pon(); clearInterval(tCuenta); tCuenta = setInterval(() => { s--; if (s <= 0) clearInterval(tCuenta); else pon(); }, 1000);
+  clearTimeout(tReinicio); tReinicio = setTimeout(reiniciar, segundos * 1000);
+}
+function festejo() {
+  const f = document.createElement("div"); f.className = "fiesta";
+  for (let k = 0; k < 44; k++) {
+    const d = document.createElement("i"); d.style.background = k % 4 === 3 ? "#6cc08b" : GRANOS[k % 3].c;
+    d.style.setProperty("--dx", (Math.random() * 90 - 45) + "vw"); d.style.setProperty("--dy", (Math.random() * 75 - 40) + "vh"); d.style.setProperty("--r", Math.random() * 540 + "deg");
+    f.appendChild(d);
+  }
+  document.body.appendChild(f); setTimeout(() => f.remove(), 1700);
+}
+function enviar(obj) {
+  if (ws && ws.readyState === 1 && enLinea) ws.send(JSON.stringify(obj));
+  else if (PERMITIR_DEMO) demo(obj);                         // sin servidor: simulación
+  else recibir({ tipo: "estado", id: obj.id, fase: "error", msg: "Sin conexión con el dispensador. Avisa al encargado." });
+}
+
+/* Mensajes que llegan del servidor (los manda el HMI):
+   {tipo:"estado", id, fase, vaso:1-3, grano:1-3, msg}
+   fase: "cola" | "esperando_vaso" | "sirviendo" | "vaso_listo" | "pausa" | "retirar" | "entrega" | "listo" | "error"
+   entrega: {etapa:"cargado"|"en_ruta"|"descargando", almacen:1-3}  ·  listo puede traer almacen */
+function recibir(m) {
+  if (m.tipo === "hola_ok") {
+    hmiOn = m.hmi !== false; etiqueta(); pintar();
+    if (pedido && !pedido.fin && ws) ws.send(JSON.stringify({ tipo: "consulta", id: pedido.id }));   // recupera el estado tras una reconexión
+    return;
+  }
+  if (m.tipo === "hmi") { hmiOn = !!m.en_linea; if (!hmiOn) disp = { pedir: true, msg: "", agv: "" }; etiqueta(); pintar(); return; }
+  if (m.tipo === "disponibilidad") { disp = { pedir: !!m.pedir, msg: m.msg || "", agv: m.agv || "" }; actualizarDisp(); return; }
+  if (m.tipo !== "estado" || !pedido || (m.id && m.id !== pedido.id)) return;
+  const i = Math.min(2, Math.max(0, (m.vaso || 1) - 1)), g = GRANOS[(m.grano || 1) - 1];
+  if (m.repo && ["esperando_vaso", "sirviendo", "vaso_listo", "pausa", "retirar"].includes(m.fase)) { vasoRepo(m); pintarSeg(); return; }
+  switch (m.fase) {
+    case "cola":
+      $("segT").textContent = "Tu pedido está en fila"; estacion(-1);
+      mensaje(m.msg || (m.delante > 0 ? `Hay ${m.delante} pedido${m.delante > 1 ? "s" : ""} antes que el tuyo.` : "Tu pedido es el siguiente.")); break;
+    case "esperando_vaso":
+      $("segT").textContent = "Preparando tu pedido"; estacion(0);
+      pedido.vs = pedido.vs.map((e, k) => e === "rech" ? e : k < i ? "hecho" : k === i ? "esp" : e);
+      mensaje(m.msg || `El vaso ${i + 1} está entrando a la rueda.`); break;
+    case "sirviendo":
+      $("segT").textContent = "Preparando tu pedido"; estacion(1);
+      pedido.vs[i] = "sirv"; mensaje(`Sirviendo ${g ? g.n : ""} en el vaso ${i + 1}…`); break;
+    case "vaso_listo": if (pedido.vs[i] !== "rech") pedido.vs[i] = "hecho"; estacion(2); mensaje(`Vaso ${i + 1} servido. Ahora se tapa.`); break;
+    case "pausa":
+      if (m.rechazo && m.grano) { vasoRechazado(m.grano); estacion(3); $("segT").textContent = "Un vaso no pasó la revisión"; mensaje(m.msg || "Un vaso fue rechazado. Lo servimos de nuevo…", "mal"); break; }
+      if (m.listoOtro) {                                   // v16: lote verificado; sale con el siguiente pedido
+        pedido.vs = pedido.vs.map(e => e === "rech" ? "hecho" : e); estacion(3);
+        $("segT").textContent = "¡Tu lote está listo!"; mensaje(m.msg || "Tu lote está listo.", "bien");
+        $("otro").hidden = false; $("otro").disabled = false; $("otro").textContent = "Hacer el siguiente pedido";
+        $("cuenta").hidden = false; $("cuenta").textContent = "Tu lote se va en el carro cuando la rueda gire con el siguiente pedido. Ya puedes hacerlo.";
+        break;
+      }
+      if (/verific|no pasó/i.test(m.msg || "")) { estacion(3); $("segT").textContent = "Revisando tu pedido"; }
+      mensaje(m.msg || "Tu pedido está en pausa. Un momento…"); break;
+    case "retirar": mensaje(m.msg || `Retira el vaso ${i + 1}.`); break;
+    case "entrega": {
+      const d = m.almacen || 0;
+      pedido.vs = ["hecho", "hecho", "hecho"];
+      mostrarRuta(true); estacion(4); marcarPaso(3);
+      $("segT").textContent = m.etapa === "descargando" ? `Llegó al Almacén ${d}` : m.etapa === "cargado" ? "Tu lote está listo" : "Tu pedido va en camino";
+      mensaje(m.msg || (d ? `Va en camino al Almacén ${d}.` : "El carro sale a entregar tu lote."));
+      if (m.etapa === "cargado") { rutaDestino(0); rutaIr("carga"); }
+      else if (d) { rutaDestino(d); rutaIr("a" + d); }
+      break;
+    }
+    case "listo":
+      if (m.almacen) {                                 // entregado por el carro AGV
+        pedido.vs = ["hecho", "hecho", "hecho"]; pedido.fin = true;
+        mostrarRuta(true); rutaDestino(m.almacen, true); rutaIr("a" + m.almacen);
+        estacion(4, true); marcarPaso(4);
+        $("segT").textContent = "¡Pedido entregado!"; mensaje(m.msg || `Tu pedido fue entregado en el Almacén ${m.almacen}.`, "bien"); festejo();
+        if (disp.pedir) terminar(ESPERA_REINICIO / 1000); else esperarCarro();
+        break;
+      }
+      pedido.vs = ["hecho", "hecho", "hecho"]; pedido.fin = true; estacion(3, true);
+      $("segT").textContent = "¡Gracias por tu pedido!"; mensaje(m.msg || "¡Pedido completo!", "bien"); festejo();
+      terminar(ESPERA_REINICIO / 1000); break;
+    case "error":
+      pedido.fin = true; estacion(-1);
+      $("segT").textContent = "No se pudo completar"; mensaje(m.msg || "No se pudo completar el pedido.", "mal");
+      terminar(ESPERA_REINICIO / 1000); break;
+  }
+  pintarSeg();
+}
+
+/* ===== Conexión (WebSocket al servidor de la laptop) ===== */
+function conectar() {
+  if (location.protocol.indexOf("http") !== 0) { conexion(false, PERMITIR_DEMO ? "Modo demostración" : "Sin servidor: ábrela desde la dirección de npm start"); pintar(); return; }
+  const url = WS_URL || (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+  try { ws = new WebSocket(url); } catch (e) { conexion(false, PERMITIR_DEMO ? "Modo demostración" : "Sin conexión con el servidor"); pintar(); return; }
+  ws.onopen = () => ws.send(JSON.stringify({ tipo: "hola", rol: "tienda" }));
+  ws.onmessage = e => { try { recibir(JSON.parse(e.data)); } catch (_) {} };
+  ws.onclose = () => { conexion(false, PERMITIR_DEMO ? "Sin conexión · demostración" : "Sin conexión con el servidor"); pintar(); setTimeout(conectar, 4000); };
+}
+
+/* ===== Simulación (solo cuando no hay servidor) ===== */
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+async function demo(obj) {
+  const id = obj.id, seq = secuencia();
+  const est = o => { if (pedido && pedido.id === id) recibir({ tipo: "estado", id, ...o }); };
+  for (let k = 0; k < seq.length; k++) {
+    est({ fase: "esperando_vaso", vaso: k + 1 }); await dormir(1400);
+    est({ fase: "sirviendo", vaso: k + 1, grano: seq[k] + 1 }); await dormir(3100);
+    est({ fase: "vaso_listo", vaso: k + 1 }); await dormir(1300);
+  }
+  est({ fase: "pausa", msg: "Verificando la calidad de tus vasos…" }); await dormir(1800);
+  const d = 1 + Math.floor(Math.random() * 3);
+  est({ fase: "entrega", etapa: "cargado", msg: "¡Lote completo y verificado! El carro AGV sale a entregarlo." }); await dormir(1600);
+  est({ fase: "entrega", etapa: "en_ruta", almacen: d, msg: `Tu lote va en camino al Almacén ${d}.` }); await dormir(4200);
+  disp = { pedir: false, agv: "DESCARGANDO", msg: "El carro está entregando un pedido. Podrás hacer tu pedido cuando regrese a la posición de carga." };
+  est({ fase: "listo", almacen: d, msg: `¡Tu pedido fue entregado en el Almacén ${d}!` }); await dormir(2400);
+  recibir({ tipo: "disponibilidad", pedir: false, agv: "REGRESANDO", msg: "El carro regresa a la posición de carga. En cuanto llegue podrás hacer tu pedido." });
+  await dormir(4200);
+  recibir({ tipo: "disponibilidad", pedir: true, agv: "CARGA", msg: "" });
+}
+
+construir(); pintar(); conectar();
+</script>
+</body>
+</html>
