@@ -30,6 +30,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .actGrid{display:grid;gap:10px}
 .actFila{display:grid;grid-template-columns:minmax(150px,1fr) 52px 100px 30px 52px minmax(170px,1.2fr);gap:8px;align-items:center}
 .actFila>span{font-weight:700}
+.actSub{display:block;font-weight:500;font-size:12px;color:var(--muted)}
 .actFila input[type=number]{text-align:center;font-size:18px;font-weight:700;padding:8px 4px;min-width:0}
 .actFila em{font-style:normal;color:var(--muted)}
 .actSent{display:flex;gap:8px;align-items:center;font-weight:600}
@@ -216,14 +217,18 @@ details summary:hover{color:var(--text)}
 #svgAct #actVaso{transition:transform 1.5s cubic-bezier(.45,0,.25,1),opacity .6s ease}
 #svgAct #actTapa{transition:opacity .4s ease}
 #svgAct .bin{transition:filter .4s ease}
-#svgAct.act-ok #actRod,#svgAct.act-ok #actVaso{transform:translateX(52px)}
+/* v17: en reposo el actuador está EXTENDIDO (tapa el paso al carro: los vasos van a la merma);
+   con un vaso aprobado se RETRAE, el vaso pasa al carro y luego vuelve a extenderse */
+#svgAct #actRod{transform:translateX(52px)}
+#svgAct #actVaso{transform:translateX(-70px)}
+#svgAct.act-ok #actRod{transform:translateX(0)}
+#svgAct.act-ok.act-drop #actVaso{transform:translateX(70px);opacity:0;transition:transform 1.2s ease-in,opacity .9s ease .5s}
 #svgAct.act-ok #actHead{filter:url(#fGlowOk)}
 #svgAct.act-ok #binOk{filter:url(#fGlowOk)}
 #svgAct.act-rej #actTapa{opacity:0}
 #svgAct.act-rej #actVaso rect:first-child{stroke:var(--red)}
 #svgAct.act-rej #binRej{filter:url(#fGlowRej)}
-#svgAct.act-rej.act-drop #actVaso{transform:translateY(80px);opacity:0;transition:transform .9s ease-in,opacity .7s ease}
-#svgAct.act-ok.act-drop #actVaso{opacity:0}
+#svgAct.act-rej.act-drop #actVaso{transform:translate(-70px,80px);opacity:0;transition:transform .9s ease-in,opacity .7s ease}
 .lamp{display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--inset);border:2px solid var(--border);transition:background .2s,box-shadow .2s}
 .lamp.on-ok{background:var(--green);border-color:var(--green);box-shadow:0 0 12px var(--green)}
 .lamp.on-rej{background:var(--red);border-color:var(--red);box-shadow:0 0 12px var(--red)}
@@ -945,15 +950,15 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
                 <!-- contenedores de salida -->
                 <g id="binOk" class="bin">
                   <rect x="286" y="112" width="48" height="38" rx="6" stroke-width="2.5" style="fill:var(--panel2);stroke:var(--green)"/>
-                  <text x="310" y="106" text-anchor="middle" font-size="10" font-weight="700" style="fill:var(--green)">BUENOS</text>
+                  <text x="310" y="106" text-anchor="middle" font-size="10" font-weight="700" style="fill:var(--green)">AL CARRO</text>
                 </g>
                 <g id="binRej" class="bin">
-                  <rect x="200" y="182" width="56" height="36" rx="6" stroke-width="2.5" style="fill:var(--panel2);stroke:var(--red)"/>
-                  <text x="228" y="232" text-anchor="middle" font-size="10" font-weight="700" style="fill:var(--red)">RECHAZO</text>
+                  <rect x="136" y="182" width="56" height="36" rx="6" stroke-width="2.5" style="fill:var(--panel2);stroke:var(--red)"/>
+                  <text x="164" y="232" text-anchor="middle" font-size="10" font-weight="700" style="fill:var(--red)">MERMA</text>
                 </g>
               </svg>
-              <div class="status" id="actEstado">EN REPOSO</div>
-              <p class="hint hintMin" style="margin:10px 0 0">Aprobado: el actuador extiende y empuja el recipiente con tapa. Rechazado: el actuador no sale y el recipiente se marca como rechazado.</p>
+              <div class="status" id="actEstado">EXTENDIDO · paso a la merma</div>
+              <p class="hint hintMin" style="margin:10px 0 0">En reposo el actuador está extendido (los vasos van a la merma). Aprobado: se retrae, el vaso pasa al carro y se vuelve a extender. Rechazado: sigue extendido y el vaso va a la merma.</p>
               <div class="row" style="margin-top:12px"><button class="btn sm" id="btnActOk" type="button">Probar aprobado</button><button class="btn sm red" id="btnActRech" type="button">Probar rechazado</button></div>
             </section>
           </div>
@@ -1198,16 +1203,16 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
           </section>
           <section class="grp wide" id="actPanel">
             <h3>Actuador lineal (servo de 360°) · se mueve por tiempo</h3>
-            <div class="viewHeader" style="padding:0 0 10px">El servo de 360° no va a un ángulo: gira mientras tiene señal. Por eso el actuador se mueve por <b>tiempo</b>. Prueba con los botones hasta que <b>extienda completo</b> y <b>regrese completo</b>, y luego pulsa <b>"Guardar en el Arduino"</b>.</div>
+            <div class="viewHeader" style="padding:0 0 10px">El servo de 360° no tiene HOME: se mueve por <b>tiempo</b>. <b>Antes de prender</b>, déjalo a mano <b>retraído</b> (paso de los recipientes). <b>Al prender</b>, el Arduino lo <b>extiende</b> (los vasos van a la <b>merma</b>). Cuando Calidad <b>aprueba</b> un vaso, se <b>retrae</b> para que caiga al carro y luego se vuelve a extender. Prueba con los botones hasta que extienda y retraiga completo, y pulsa <b>"Guardar en el Arduino"</b>.</div>
             <div class="actGrid">
-              <div class="actFila"><span>Tiempo para EXTENDER</span>
-                <button class="btn sm" type="button" data-act="ida:-100">−</button><input type="number" id="actIda" min="50" max="20000" step="10" value="900"><em>ms</em><button class="btn sm" type="button" data-act="ida:100">+</button>
+              <div class="actFila"><span>Tiempo para EXTENDER <small class="actSub">(a la merma · write 0)</small></span>
+                <button class="btn sm" type="button" data-act="ida:-100">−</button><input type="number" id="actIda" min="50" max="20000" step="10" value="1100"><em>ms</em><button class="btn sm" type="button" data-act="ida:100">+</button>
                 <button class="btn sm green" type="button" id="actProbarIda">▶ Probar extender</button></div>
-              <div class="actFila"><span>Tiempo para REGRESAR</span>
-                <button class="btn sm" type="button" data-act="reg:-100">−</button><input type="number" id="actReg" min="50" max="20000" step="10" value="900"><em>ms</em><button class="btn sm" type="button" data-act="reg:100">+</button>
-                <button class="btn sm green" type="button" id="actProbarReg">◀ Probar regresar</button></div>
+              <div class="actFila"><span>Tiempo para RETRAER <small class="actSub">(paso al carro · write 180)</small></span>
+                <button class="btn sm" type="button" data-act="reg:-100">−</button><input type="number" id="actReg" min="50" max="20000" step="10" value="1136"><em>ms</em><button class="btn sm" type="button" data-act="reg:100">+</button>
+                <button class="btn sm green" type="button" id="actProbarReg">◀ Probar retraer</button></div>
               <div class="actFila"><span>Velocidad</span>
-                <input type="range" id="actVel" min="100" max="500" step="25" value="400" style="grid-column:2/5"><em id="actVelTxt">400</em>
+                <input type="range" id="actVel" min="10" max="90" step="5" value="90" style="grid-column:2/5"><em id="actVelTxt">90</em>
                 <label class="actSent"><input type="checkbox" id="actSent"> Invertir sentido</label></div>
             </div>
             <div class="actBotones">
@@ -1408,8 +1413,8 @@ class SimGinebra{
   }
   gradosLinea(){ return "GRADOS," + this.stGrados.map(g => Math.round(g*100)).join(",") + "," + PASOS_REV_SIM; }
   actLinea(){
-    if(!this.act){ try{ this.act = JSON.parse(localStorage.getItem("hmi01_simAct") || "null"); }catch(_){} }
-    if(!this.act) this.act = { ida:900, reg:900, vel:400, sent:1 };
+    if(!this.act){ try{ this.act = JSON.parse(localStorage.getItem("hmi01_simAct2") || "null"); }catch(_){} }
+    if(!this.act) this.act = { ida:1100, reg:1136, vel:90, sent:1 };
     const a = this.act; return `ACT_T,${a.ida},${a.reg},${a.vel},${a.sent}`;
   }
   iniciarDwell(){ this.tCarga = null; this.tTapa = null; this.d.estado = 1; this.evaluar(); }
@@ -1653,8 +1658,8 @@ class SimGinebra{
       case "ACT_T?": this.emit(this.actLinea()); break;
       case "ACT_T": {
         const v = arg.split(",").map(Number);
-        if(v.length === 4 && v[0] >= 50 && v[0] <= 20000 && v[1] >= 50 && v[1] <= 20000 && v[2] >= 50 && v[2] <= 500 && (v[3] === 1 || v[3] === -1)){
-          this.act = { ida:v[0], reg:v[1], vel:v[2], sent:v[3] }; try{ localStorage.setItem("hmi01_simAct", JSON.stringify(this.act)); }catch(_){}
+        if(v.length === 4 && v[0] >= 50 && v[0] <= 20000 && v[1] >= 50 && v[1] <= 20000 && v[2] >= 10 && v[2] <= 90 && (v[3] === 1 || v[3] === -1)){
+          this.act = { ida:v[0], reg:v[1], vel:v[2], sent:v[3] }; try{ localStorage.setItem("hmi01_simAct2", JSON.stringify(this.act)); }catch(_){}
           this.emit(this.actLinea());
         } else this.emit("ERR,ACT_T");
       } break;
@@ -2480,16 +2485,16 @@ function actVisual(tipo){
   actLimpiar();
   void svg.getBoundingClientRect();                       // reinicia las transiciones si llega otro evento seguido
   const T = (fn, ms) => actTimers.push(setTimeout(fn, ms));
-  const reposo = () => { txt.textContent = "EN REPOSO"; txt.className = "status"; };
+  const reposo = () => { txt.textContent = "EXTENDIDO · paso a la merma"; txt.className = "status"; };
   if(tipo === "ok"){
     svg.classList.add("act-ok");
-    txt.textContent = "APROBADO · tapa detectada, el actuador empuja el vaso"; txt.className = "status run";
-    T(() => svg.classList.add("act-drop"), ACT_VIS.ext);                       // el vaso entra al contenedor
-    T(() => svg.classList.remove("act-ok"), ACT_VIS.ext + ACT_VIS.hold);       // el vástago regresa
+    txt.textContent = "APROBADO · el actuador se retrae y el vaso pasa al carro"; txt.className = "status run";
+    T(() => svg.classList.add("act-drop"), ACT_VIS.ext);                       // retraído: el vaso pasa al carro
+    T(() => svg.classList.remove("act-ok"), ACT_VIS.ext + ACT_VIS.hold);       // se vuelve a extender
     T(() => { svg.classList.remove("act-drop"); reposo(); }, ACT_VIS.ext + ACT_VIS.hold + ACT_VIS.ret);
   } else {
-    svg.classList.add("act-rej");                                              // el actuador no sale
-    txt.textContent = "RECHAZADO · sin tapa, el actuador no sale"; txt.className = "status stop";
+    svg.classList.add("act-rej");                                              // sigue extendido
+    txt.textContent = "RECHAZADO · sigue extendido, el vaso va a la merma"; txt.className = "status stop";
     T(() => svg.classList.add("act-drop"), ACT_VIS.rechDrop);                  // el vaso cae a RECHAZO
     T(() => { svg.classList.remove("act-rej", "act-drop"); reposo(); }, ACT_VIS.rechHold);
   }
@@ -2739,7 +2744,7 @@ $("#moveDegList").addEventListener("click", e => {
   enviarCtl("gin", `GOTO_DEG:${i}:${v}`); toast(`Moviendo a ${v}° y guardado como ${NOMBRES_EST_CAL[i]}`);
 });
 /* ---------- actuador lineal (servo 360°, por tiempo) ---------- */
-const ACT = { ida:900, reg:900, vel:400, sent:1, leido:false };
+const ACT = { ida:1100, reg:1136, vel:90, sent:1, leido:false };
 function actAviso(t, mal){ const e = $("#actInfo"); e.textContent = t; e.style.color = mal ? "var(--red)" : ""; }
 function actListo(){
   if(!CTL.gin.conectado){ actAviso("✖ La rueda no está conectada (pestaña Comunicación).", true); return false; }
@@ -2752,7 +2757,7 @@ function actValores(){
 }
 function actPintar(){
   $("#actIda").value = ACT.ida; $("#actReg").value = ACT.reg; $("#actVel").value = ACT.vel; $("#actVelTxt").textContent = ACT.vel; $("#actSent").checked = ACT.sent === -1;
-  actAviso(`Guardado en el Arduino: extender ${ACT.ida} ms · regresar ${ACT.reg} ms · velocidad ${ACT.vel}${ACT.sent === -1 ? " · sentido invertido" : ""}.`);
+  actAviso(`Guardado en el Arduino: extender ${ACT.ida} ms · retraer ${ACT.reg} ms · velocidad ${ACT.vel}${ACT.vel === 90 ? " (máxima)" : ""}${ACT.sent === -1 ? " · sentido invertido" : ""}.`);
 }
 function onActT(l){
   const p = l.split(",").map(Number);
@@ -2764,7 +2769,7 @@ function actProbar(ms){
   if(!actListo()) return; const x = actValores(); if(!x) return;
   if(x.vel !== ACT.vel || x.sent !== ACT.sent) enviarCtl("gin", `ACT_T:${ACT.ida},${ACT.reg},${x.vel},${x.sent}`);
   enviarCtl("gin", `ACT_GIRO:${ms}`);
-  actAviso(ms > 0 ? `Extendiendo ${ms} ms… ¿llegó al final? Si le faltó, sube el tiempo; si forzó, bájalo.` : `Regresando ${-ms} ms… ¿regresó completo? Si le faltó, sube el tiempo.`);
+  actAviso(ms > 0 ? `Extendiendo ${ms} ms… ¿extendió completo? Si le faltó, sube el tiempo; si forzó, bájalo.` : `Retrayendo ${-ms} ms… ¿retrajo completo? Si le faltó, sube el tiempo; si forzó, bájalo.`);
 }
 $$("[data-act]").forEach(b => b.addEventListener("click", () => {
   const [q, d] = b.dataset.act.split(":"), inp = $(q === "ida" ? "#actIda" : "#actReg");

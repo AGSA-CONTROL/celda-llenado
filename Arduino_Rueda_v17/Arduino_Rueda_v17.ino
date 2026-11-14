@@ -320,42 +320,44 @@ bool sensorTapaIndRaw(){ return leer(PIN_TAPA_IND, TAPA_IND_ACT_BAJO); }
 bool sensorTapaInd(){ return tapaIndCont >= TAPA_IND_DEBOUNCE_TICKS; }
 
 /* ================= ACTUADOR E3 · SERVO DE ROTACIÓN CONTINUA (360°) =================
-   Desvía los vasos BUENOS (con tapa). Servo de 360° en PIN_ACT_SERVO (A0).
-   Un servo de 360° NO va a un ángulo: gira mientras recibe pulso, por eso se mueve POR TIEMPO:
-     1) gira hacia ADELANTE durante T_ACT_IDA_MS      (empuja / se extiende)
-     2) se detiene (sin pulso) y se queda así          (deja caer el vaso)
-     3) gira hacia ATRÁS durante T_ACT_REGRESO_MS      (regresa a su lugar)
-     4) se detiene: queda en reposo
-   Regresa cuando el sensor de E2 (pin 11) ve un recipiente nuevo tras T_CAIDA_MS, o por T_ACT_MAX_MS.
-   Sin tapa = rechazo (lo maneja el desviador, pin 13); el actuador no se mueve.
+   Servo de 360° en PIN_ACT_SERVO (A0). No tiene HOME: se mueve POR TIEMPO.
+     write(0)   = EXTENDER  (T_ACT_IDA_MS, de fábrica 1100 ms)
+     write(90)  = PARAR
+     write(180) = RETRAER   (T_ACT_REGRESO_MS, de fábrica 1136 ms)
+   ANTES DE PRENDER: deja el actuador a mano en RETRAÍDO (paso libre de los recipientes).
+   AL PRENDER: el Arduino lo EXTIENDE solo. Extendido = los vasos se van a la MERMA (rechazo).
+   VASO BUENO en Calidad (E3): se RETRAE para dejar libre el conducto y que el vaso caiga al carro AGV;
+     se queda retraído hasta que el sensor de E2 (pin 11) ve un recipiente nuevo tras T_CAIDA_MS
+     (o por T_ACT_MAX_MS) y entonces se vuelve a EXTENDER.
+   Vaso rechazado: el actuador no se mueve (ya está extendido hacia la merma).
 
-   CÓMO CALIBRARLO (consola de la rueda en el HMI):
-     ACT_EXT        gira hacia adelante T_ACT_IDA_MS y se para
-     ACT_RET        gira hacia atrás T_ACT_REGRESO_MS y se para
-     ACT_GIRO:<ms>  gira <ms> milisegundos (negativo = hacia atrás), para medir cuánto tarda
+   CÓMO CALIBRARLO (HMI > Calibración > Actuador lineal, o la consola de la rueda):
+     ACT_EXT        extiende T_ACT_IDA_MS y se para
+     ACT_RET        retrae T_ACT_REGRESO_MS y se para
+     ACT_GIRO:<ms>  gira <ms> milisegundos (+ = extender, - = retraer), para medir cuánto tarda
      ACT_STOP       lo detiene al instante
      ACT_T?                      lee los tiempos guardados -> ACT_T,ida,regreso,velocidad,sentido
      ACT_T:ida,regreso,vel,sent  los cambia y los GUARDA en la EEPROM (ya no hay que reprogramar)
    Todo esto se hace desde el HMI: pestaña Rueda > Actuador lineal.
-   - Si no llega hasta el final: sube el tiempo de ida.   Si se pasa o forza: bájalo.
-   - Si no regresa completo: sube el tiempo de regreso (con carga suele tardar distinto que de ida).
+   - Si no extiende completo: sube el tiempo de extender.   Si se pasa o forza: bájalo.
+   - Si no retrae completo: sube el tiempo de retraer.
    - Si gira al revés: cambia el sentido.
-   - Si va muy rápido o muy lento: ajusta la velocidad (100 = lento ... 500 = máxima). */
-int8_t   ACT_SENTIDO        = 1;             // 1 o -1: invierte hacia dónde es "adelante"
-const uint16_t ACT_CENTRO_US      = 1500;    // pulso de paro del servo (ver nota de "deriva" abajo)
-uint16_t ACT_VELOCIDAD_US   = 400;           // cuánto se aleja del centro: más = más rápido
-unsigned long T_ACT_IDA_MS     = 900;        // tiempo girando hacia adelante (extender) — se calibra en el HMI
-unsigned long T_ACT_REGRESO_MS = 900;        // tiempo girando hacia atrás (regresar) — se calibra en el HMI
+   - Velocidad = cuántos grados se aleja de 90 (90 = máxima, como write(0)/write(180); 10 = muy lento). */
+int8_t   ACT_SENTIDO        = 1;             // 1 o -1: invierte cuál giro es "extender"
+const uint8_t  ACT_PARO_GRADOS = 90;         // write(90) = parado (como en el código de prueba)
+uint16_t ACT_VELOCIDAD_US   = 90;            // grados que se aleja de 90: 90 = write(0) / write(180) (máxima)
+unsigned long T_ACT_IDA_MS     = 1100;       // EXTENDER: ms con write(0)   — se calibra en el HMI
+unsigned long T_ACT_REGRESO_MS = 1136;       // RETRAER:  ms con write(180) — se calibra en el HMI
 /* tiempos del actuador guardados en la EEPROM (después de la calibración de la rueda) */
 const int      EE_ACT_BASE  = 64;
-const uint16_t EE_ACT_MAGIC = 0xAC36;
+const uint16_t EE_ACT_MAGIC = 0xAC37;          // nuevo: los tiempos viejos (otra lógica) no se cargan
 struct CfgAct { uint16_t magic; uint16_t ida; uint16_t reg; uint16_t vel; int8_t sent; };
 void cargarActuador(){
   CfgAct c; EEPROM.get(EE_ACT_BASE, c);
   if(c.magic != EE_ACT_MAGIC) return;                       // nunca se guardó: valores de arriba
   if(c.ida >= 50 && c.ida <= 20000) T_ACT_IDA_MS = c.ida;
   if(c.reg >= 50 && c.reg <= 20000) T_ACT_REGRESO_MS = c.reg;
-  if(c.vel >= 50 && c.vel <= 500) ACT_VELOCIDAD_US = c.vel;
+  if(c.vel >= 10 && c.vel <= 90) ACT_VELOCIDAD_US = c.vel;
   if(c.sent == 1 || c.sent == -1) ACT_SENTIDO = c.sent;
 }
 void guardarActuador(){
@@ -368,50 +370,59 @@ void enviarActuador(){
 }
 const unsigned long T_CAIDA_MS    = 10000;   // tiempo mínimo extendido para que caiga el vaso (ajustable)
 const unsigned long T_ACT_MAX_MS  = 15000;   // respaldo: regresa aunque E2 nunca cambie
-/* Para detenerlo se le QUITA la señal (detach): así no importa si el servo tiene el cero desajustado
-   y no se queda "arrastrando" despacio. */
+/* Para detenerlo se manda write(90), igual que en el código de prueba que sí funcionó. */
 
 Servo srvAct;
 
-enum ActEstado : uint8_t { ACT_REPOSO, ACT_HACIA_ACTIVO, ACT_SOSTENIDO, ACT_REGRESANDO };
+/* REPOSO = extendido (merma) · HACIA_ACTIVO = retrayendo · SOSTENIDO = retraído (paso al carro)
+   REGRESANDO = extendiendo de nuevo · INICIO = extendiendo al prender */
+enum ActEstado : uint8_t { ACT_REPOSO, ACT_HACIA_ACTIVO, ACT_SOSTENIDO, ACT_REGRESANDO, ACT_INICIO };
 ActEstado actEstado = ACT_REPOSO;
 unsigned long actT0 = 0;
 bool actF2Libre = false;                    // E2 ya quedó libre desde que se activó
 unsigned long actTActivo = 0;               // momento en que se activó
 unsigned long actGiroFin = 0;               // giro manual (ACT_EXT / ACT_RET / ACT_GIRO): hasta cuándo
 bool actGiroManual = false;
-unsigned long actRegresoMs = T_ACT_REGRESO_MS;   // cuánto debe girar de regreso (menos si un paro lo cortó a la mitad)
+unsigned long actRegresoMs = 1100;          // cuánto debe volver a extender (menos si un paro cortó la retracción a la mitad)
 
 /* dir: 1 adelante, -1 atrás, 0 parado */
+/* dir: 1 = EXTENDER (write(0)), -1 = RETRAER (write(180)), 0 = PARAR (write(90)) */
 void actGirar(int8_t dir){
-  if(dir == 0){
-    if(srvAct.attached()) srvAct.detach();
-    pinMode(PIN_ACT_SERVO, OUTPUT);
-    digitalWrite(PIN_ACT_SERVO, LOW);
-    return;
-  }
-  if(!srvAct.attached()) srvAct.attach(PIN_ACT_SERVO, 1000, 2000);
-  srvAct.writeMicroseconds(ACT_CENTRO_US + dir * ACT_SENTIDO * (int)ACT_VELOCIDAD_US);
+  if(!srvAct.attached()) srvAct.attach(PIN_ACT_SERVO);        // mismo attach que el código de prueba
+  if(dir == 0){ srvAct.write(ACT_PARO_GRADOS); return; }
+  int g = (int)ACT_PARO_GRADOS - dir * ACT_SENTIDO * (int)ACT_VELOCIDAD_US;   // extender = 90-90 = 0 · retraer = 90+90 = 180
+  srvAct.write(constrain(g, 0, 180));
 }
 
-// Llamar desde setup(): al encender NO se mueve
+// Llamar desde setup(): el actuador se dejó a mano RETRAÍDO; al prender se EXTIENDE (posición de merma)
 void iniciarActuador() {
-  actGirar(0);
-  actEstado = ACT_REPOSO;
+  actGirar(1);
+  actT0 = millis();
+  actEstado = ACT_INICIO;
 }
 
 bool actuadorOcupado() { return actEstado != ACT_REPOSO; }
 
-// Llamar cuando E3 confirma tapa
+// Llamar cuando E3 aprueba el vaso: se RETRAE para que el vaso caiga al carro
+bool actPendiente = false;                  // llegó un vaso bueno mientras se extendía: al terminar se retrae
 void dispararActuador() {
+  if (actEstado == ACT_SOSTENIDO) { actTActivo = millis(); actF2Libre = false; return; }   // ya está retraído: sigue así
+  if (actEstado == ACT_REGRESANDO || actEstado == ACT_INICIO) { actPendiente = true; return; }
   if (actEstado != ACT_REPOSO) return;
   actGiroManual = false;
-  actGirar(1);                               // empieza a extenderse
-  actRegresoMs = T_ACT_REGRESO_MS;
+  actGirar(-1);                              // empieza a retraerse
+  actRegresoMs = T_ACT_IDA_MS;               // luego vuelve a extender todo
   actT0 = millis();
   actTActivo = actT0;
   actF2Libre = false;
   actEstado = ACT_HACIA_ACTIVO;
+}
+
+/* vaso RECHAZADO en Calidad: si el actuador quedó retraído, se extiende YA para que el vaso vaya a la merma */
+void actuadorAMerma() {
+  actPendiente = false;
+  if (actEstado != ACT_SOSTENIDO) return;
+  actGirar(1); actT0 = millis(); actEstado = ACT_REGRESANDO;
 }
 
 /* giro manual para calibrar (solo con el actuador en reposo) */
@@ -427,8 +438,11 @@ void actualizarActuador() {
   unsigned long ahora = millis();
   if (actGiroManual && (long)(ahora - actGiroFin) >= 0) { actGirar(0); actGiroManual = false; }
   switch (actEstado) {
-    case ACT_HACIA_ACTIVO:
-      if (ahora - actT0 >= T_ACT_IDA_MS) { actGirar(0); actEstado = ACT_SOSTENIDO; }   // llegó: se para
+    case ACT_INICIO:                         // al prender: termina de extenderse
+      if (ahora - actT0 >= T_ACT_IDA_MS) { actGirar(0); actEstado = ACT_REPOSO; if (actPendiente) { actPendiente = false; dispararActuador(); } }
+      break;
+    case ACT_HACIA_ACTIVO:                   // retrayendo
+      if (ahora - actT0 >= T_ACT_REGRESO_MS) { actGirar(0); actEstado = ACT_SOSTENIDO; }   // retraído: se para
       break;
     case ACT_SOSTENIDO: {
       // espera a que E2 (pin 11) quede libre y luego detecte un recipiente nuevo; respaldo por tiempo
@@ -436,14 +450,14 @@ void actualizarActuador() {
       bool liberarPorF2     = actF2Libre && sensorF2() && ahora - actTActivo >= T_CAIDA_MS;
       bool liberarPorTiempo = ahora - actTActivo >= T_ACT_MAX_MS;
       if (liberarPorF2 || liberarPorTiempo) {
-        actGirar(-1);                        // regresa girando al revés
+        actGirar(1);                         // vuelve a extender (merma)
         actT0 = ahora;
         actEstado = ACT_REGRESANDO;
       }
       break;
     }
     case ACT_REGRESANDO:
-      if (ahora - actT0 >= actRegresoMs) { actGirar(0); actEstado = ACT_REPOSO; }
+      if (ahora - actT0 >= actRegresoMs) { actGirar(0); actEstado = ACT_REPOSO; if (actPendiente) { actPendiente = false; dispararActuador(); } }
       break;
     default: break;
   }
@@ -649,7 +663,8 @@ void tareasEstaciones(long dt){
 
   if(!vaso[3].verificado && (!vaso[3].presente || sensorVisto[3] || esperaVencida[3])){
     vaso[3].verificado = true;
-    if(vaso[3].presente && sensorVisto[3]){ if(vaso[3].cuenta){ buenos++; Serial.println("CUENTA,BUENO"); } dispararActuador(); reportarVerif(vaso[3].grano, true); }   // dispensado + tapa (pin 10): bueno y actuador
+    if(vaso[3].presente && sensorVisto[3]){ if(vaso[3].cuenta){ buenos++; Serial.println("CUENTA,BUENO"); } dispararActuador(); reportarVerif(vaso[3].grano, true); }   // dispensado + tapa (pin 10): bueno -> se retrae
+    else if(vaso[3].presente) actuadorAMerma();                                                                                   // rechazo: extendido hacia la merma
   }
 }
 
@@ -676,7 +691,7 @@ bool estacionLista(uint8_t s){
   if(vaso[s].presente && !sensorVisto[s] && !esperaVencida[s]) return false;
   if(vaso[s].presente && !tareaHecha(s)) return false;     // no avanza a mitad de llenado/tapado
   if(s == 2 && sensorVisto[2] && !tapaE2Hecha) return false; // F2 ve un envase: espera a terminar el tapado
-  if(s == 3 && sensorVisto[3] && actEstado == ACT_HACIA_ACTIVO) return false; // E3: espera a que el actuador llegue a su posición activa
+  if(s == 3 && sensorVisto[3] && (actEstado == ACT_HACIA_ACTIVO || actEstado == ACT_REGRESANDO || actEstado == ACT_INICIO)) return false; // E3: no suelta el vaso mientras el actuador se mueve
   if(!requiereOk(s)) return true;
   return tareaParaOk(s) && okLatch[s];
 }
@@ -796,10 +811,10 @@ void cmdParo(){
   motorDc(false); vibFinHasta = 0; okLlenadoPend = false;
   actGirar(0); actGiroManual = false;            // el actuador se detiene donde esté
   if(actEstado == ACT_HACIA_ACTIVO){                              // quedó a medio camino: regresará solo lo que avanzó
-    actRegresoMs = (unsigned long)((millis() - actT0) * (float)T_ACT_REGRESO_MS / T_ACT_IDA_MS);
+    actRegresoMs = (unsigned long)((millis() - actT0) * (float)T_ACT_IDA_MS / T_ACT_REGRESO_MS);
     actEstado = ACT_SOSTENIDO;
   }
-  else if(actEstado == ACT_REGRESANDO) actEstado = ACT_REPOSO;
+  else if(actEstado == ACT_REGRESANDO || actEstado == ACT_INICIO) actEstado = ACT_REPOSO;
 }
 void cmdReset(){
   if(estado != ST_ESTOP) return;
@@ -933,7 +948,7 @@ void procesarLinea(char* l){
   else if(!strncmp(l,"ACT_T:",6)){
     long ida = 0, reg = 0, vel = 0, sen = 0;
     if(sscanf(l + 6, "%ld,%ld,%ld,%ld", &ida, &reg, &vel, &sen) == 4 && ida >= 50 && ida <= 20000 && reg >= 50 && reg <= 20000
-       && vel >= 50 && vel <= 500 && (sen == 1 || sen == -1) && actEstado == ACT_REPOSO){
+       && vel >= 10 && vel <= 90 && (sen == 1 || sen == -1) && actEstado == ACT_REPOSO){
       T_ACT_IDA_MS = ida; T_ACT_REGRESO_MS = reg; ACT_VELOCIDAD_US = vel; ACT_SENTIDO = sen;
       guardarActuador(); enviarActuador();
     } else Serial.println(F("ERR,ACT_T"));
