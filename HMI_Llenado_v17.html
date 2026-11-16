@@ -1172,7 +1172,7 @@ window.ALM_PEDIDO = {};
       <div class="cfg" id="dsp-vtInfo">Aún no se lee la calibración del Arduino.</div>
       <div class="vibCard" id="vibCard">
         <div class="vibHead"><h3>Vibrador</h3><span class="vibPill" id="vibPill">SIN CONEXIÓN</span></div>
-        <p class="ayuda">Motor vibrador del <b>pin 4 del Arduino de la rueda</b>. Préndelo y apágalo las veces que quieras para probarlo. Solo con la máquina en reposo: durante un pedido se prende solo al dispensar.</p>
+        <p class="ayuda">Motor vibrador del <b>pin 4 del Arduino de la rueda</b>. Préndelo y apágalo cuando quieras, las veces que quieras.</p>
         <button type="button" class="vibBtn" id="vibBtn" disabled>▶ Encender vibrador</button>
         <div class="vibPol">
           <span>El relé / driver enciende con:</span>
@@ -2264,12 +2264,11 @@ const VIBR = (() => {
   const el = id => document.getElementById(id);
   let msgAuto = false;                                    // mensaje puesto por pintar() (se borra solo)
   const msg = (t, warn, auto) => { const m = el("vibMsg"); if(m){ m.textContent = t || ""; m.className = "vibMsg" + (warn ? " warn" : ""); } msgAuto = !!auto; };
-  const ocupado = () => (window.DISP && DISP.loteActivo && DISP.loteActivo()) ? true : false;
   function pintar(){
     const b = el("vibBtn"), p = el("vibPill"); if(!b || !p) return;
     const con = typeof CTL !== "undefined" && CTL.gin.conectado;
     if(!con){ st.on = null; }
-    b.disabled = !con || H.estop || ocupado();
+    b.disabled = !con;                                     // se puede usar siempre (también en automático o con pedido)
     b.classList.toggle("on", st.on === 1);
     b.textContent = st.on === 1 ? "■ Apagar vibrador" : "▶ Encender vibrador";
     p.textContent = !con ? "SIN CONEXIÓN" : st.on === 1 ? "VIBRANDO" : st.on === 0 ? "APAGADO" : "—";
@@ -2277,7 +2276,6 @@ const VIBR = (() => {
     if(st.alto != null){ el("vibPolAlto").checked = st.alto === 1; el("vibPolBajo").checked = st.alto === 0; }
     if(!con) msg("Conecta la rueda (pestaña Comunicación) para usar el vibrador.", false, true);
     else if(H.estop) msg("Paro de emergencia activo: el vibrador no enciende.", true, true);
-    else if(ocupado()) msg("Hay un lote corriendo: el vibrador se maneja solo al dispensar.", false, true);
     else if(msgAuto) msg("");
   }
   function mandar(cmd){ if(typeof CTL === "undefined" || !CTL.gin.conectado){ pintar(); return false; } enviarCtl("gin", cmd); return true; }
