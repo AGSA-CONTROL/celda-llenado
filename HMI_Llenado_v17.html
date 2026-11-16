@@ -1179,7 +1179,7 @@ window.ALM_PEDIDO = {};
           <label><input type="radio" name="vibPol" value="1" id="vibPolAlto"> Señal ALTA (HIGH)</label>
           <label><input type="radio" name="vibPol" value="0" id="vibPolBajo"> Señal BAJA (LOW)</label>
         </div>
-        <p class="ayuda vibNota">Si el vibrador hace lo contrario (vibra cuando dice APAGADO), cambia a la otra señal. Se guarda en el Arduino. Por seguridad se apaga solo a los 60 s.</p>
+        <p class="ayuda vibNota">Si el vibrador hace lo contrario (vibra cuando dice APAGADO), cambia a la otra señal. Se guarda en el Arduino. Prendido con este botón solo se apaga con el botón, con el paro o a los 10 min por seguridad.</p>
         <div class="vibMsg" id="vibMsg" aria-live="polite"></div>
       </div>
     </section>
@@ -1563,7 +1563,7 @@ class SimGinebra{
   gradosLinea(){ return "GRADOS," + this.stGrados.map(g => Math.round(g*100)).join(",") + "," + PASOS_REV_SIM; }
   vibLinea(){
     if(this.vibAlto == null){ try{ const v = localStorage.getItem("hmi01_simVibAlto"); this.vibAlto = v === "0" ? 0 : 1; }catch(_){ this.vibAlto = 1; } }
-    return `VIB,${this.vib ? 1 : 0},${this.vibAlto},${this.d.estado === 4 ? 1 : 0}`;
+    return `VIB,${this.vib ? 1 : 0},${this.vibAlto},${this.d.estado === 4 ? 1 : 0},${this.vibCausa || 0},${this.vibMan ? 1 : 0}`;
   }
   actLinea(){
     if(!this.act){ try{ this.act = JSON.parse(localStorage.getItem("hmi01_simAct2") || "null"); }catch(_){} }
@@ -1744,7 +1744,7 @@ class SimGinebra{
         }
         break;
       case "PAUSA": if(d.estado === 1 || d.estado === 9){ this.prev = d.estado; d.estado = 3; } break;
-      case "PARO": if(d.estado !== 4){ this.prev = d.estado; d.estado = 4; this.valv = 0; this.servo = 0; if(this.vib){ this.vib = 0; this.emit(this.vibLinea()); } } break;
+      case "PARO": if(d.estado !== 4){ this.prev = d.estado; d.estado = 4; this.valv = 0; this.servo = 0; if(this.vib){ this.vib = 0; this.vibMan = 0; this.vibCausa = 4; this.emit(this.vibLinea()); } } break;
       case "RESET": { const f = d.f.slice(); this.reset(); this.d.f = f; } break;
       case "PASO":
         if(d.estado === 10){ d.estado = 2; this.idxT = this.cfg.tIndex; }   // modo manual: avanza una estación
@@ -1763,7 +1763,8 @@ class SimGinebra{
         if(d.estado === 1 || d.estado === 9){ this.ok[s] = true; if(d.estado === 9) this.evaluar(); }
       } break;
       case "AGV": this.agvOk = arg === "1"; if(d.estado === 1 || d.estado === 9) this.evaluar(); break;
-      case "VIB": if(arg === "1"){ if(d.estado !== 4) this.vib = 1; } else if(arg === "0") this.vib = 0; this.emit(this.vibLinea()); break;
+      case "VIB": if(!this.vibMan){ if(arg === "1"){ if(d.estado !== 4) this.vib = 1; } else if(arg === "0"){ this.vib = 0; this.vibCausa = 0; } } this.emit(this.vibLinea()); break;
+      case "VIB_MAN": if(arg === "1"){ if(d.estado !== 4){ this.vib = 1; this.vibMan = 1; this.vibCausa = 0; } } else { this.vib = 0; this.vibMan = 0; this.vibCausa = 0; } this.emit(this.vibLinea()); break;
       case "VIB?": this.emit(this.vibLinea()); break;
       case "VIB_POL": this.vibAlto = arg === "1" ? 1 : 0; try{ localStorage.setItem("hmi01_simVibAlto", String(this.vibAlto)); }catch(_){} this.emit(this.vibLinea()); break;
       case "SPEED": { const v = Number(arg); if(v >= 10 && v <= 100){ this.cfg.tIndex = duracionIndexado(v); this.speed = 1; } } break;
@@ -2043,6 +2044,7 @@ function alLinea(k, linea){
   if(k === "gin" && linea.startsWith("GRADOS,")){ onGrados(linea); return; }
   if(k === "gin" && linea.startsWith("ACT_T,")){ onActT(linea); return; }
   if(k === "gin" && linea.startsWith("VIB,")){ if(window.VIBR) VIBR.deLinea(linea); return; }
+  if(k === "gin" && linea === "BOOT"){ if(window.VIBR) VIBR.reinicio(); return; }   // el Arduino de la rueda se reinició
   if(k === "gin" && linea === "ERR,ACT_T"){ ACT.guardando = false; actAviso("✖ El Arduino no aceptó los tiempos (el actuador debe estar en reposo).", true); return; }
   if(k === "gin"){
     const d = parseGIN(linea);
@@ -2260,7 +2262,13 @@ function qcDeFrame(d, p){
 /* ===== VIBRADOR (pestaña Dispensado › Calibrar): encender / apagar a mano y elegir la señal del relé =====
    Órdenes a la rueda: VIB:1 · VIB:0 · VIB? · VIB_POL:1|0 → responde VIB,<encendido>,<HIGH enciende>,<paro> */
 const VIBR = (() => {
-  const st = { on:null, alto:null, paro:0, pidio:null, pidioPol:null, t:0 };
+  const st = { on:null, alto:null, paro:0, causa:0, manual:0, pidio:null, pidioPol:null, t:0, tBoton:0 };
+  const CAUSA = {
+    1: "se apagó porque el sensor E1 (pin 8) dejó de ver el vaso",
+    2: "se apagó solo por seguridad (tiempo máximo)",
+    3: "se apagó al terminar el dispensado",
+    4: "se apagó por el paro de emergencia"
+  };
   const el = id => document.getElementById(id);
   let msgAuto = false;                                    // mensaje puesto por pintar() (se borra solo)
   const msg = (t, warn, auto) => { const m = el("vibMsg"); if(m){ m.textContent = t || ""; m.className = "vibMsg" + (warn ? " warn" : ""); } msgAuto = !!auto; };
@@ -2282,7 +2290,7 @@ const VIBR = (() => {
   function deLinea(l){
     const v = l.split(",").map(Number);
     const antes = st.on;
-    st.on = v[1] ? 1 : 0; st.alto = v[2] ? 1 : 0; st.paro = v[3] ? 1 : 0;
+    st.on = v[1] ? 1 : 0; st.alto = v[2] ? 1 : 0; st.paro = v[3] ? 1 : 0; st.causa = v[4] || 0; st.manual = v[5] ? 1 : 0;
     if(st.pidio !== null){
       if(st.pidio === 1 && st.on !== 1) msg(st.paro ? "No enciende: el paro de emergencia está activo." : "El Arduino no encendió el vibrador.", true);
       else msg(st.on ? "✔ El Arduino encendió el vibrador (pin 4 " + (st.alto ? "en HIGH" : "en LOW") + "). Si no se mueve, revisa la conexión o cambia la señal abajo." : "✔ Vibrador apagado.");
@@ -2290,16 +2298,16 @@ const VIBR = (() => {
     } else if(st.pidioPol != null){
       msg(st.alto === st.pidioPol ? "✔ Guardado en el Arduino: el vibrador enciende con señal " + (st.alto ? "ALTA (HIGH)." : "BAJA (LOW).") : "El Arduino no guardó la señal.", st.alto !== st.pidioPol);
       st.pidioPol = null;
-    } else if(antes === 1 && st.on === 0) msg(H.estop ? "Paro de emergencia: el vibrador se apagó." : "El vibrador se apagó solo (fin del dispensado, se quitó el vaso o pasaron 60 s).", !!H.estop);
+    } else if(antes === 1 && st.on === 0) msg("⚠ El vibrador " + (CAUSA[st.causa] || "se apagó") + ".", true);
     pintar();
   }
   function iniciar(){
     const b = el("vibBtn"); if(!b) return;
     b.addEventListener("click", () => {
       const quiere = st.on === 1 ? 0 : 1;
-      st.pidio = quiere;
+      st.pidio = quiere; st.tBoton = Date.now();
       msg(quiere ? "Encendiendo…" : "Apagando…");
-      mandar("VIB:" + quiere);
+      mandar("VIB_MAN:" + quiere);                 // a mano: solo lo apaga este botón (o el paro)
       setTimeout(() => { if(st.pidio !== null){ st.pidio = null; msg("La rueda no contestó. Sube el programa nuevo de la rueda (Arduino_Rueda_v17) para ver el estado del vibrador.", true); } }, 1500);
     });
     ["vibPolAlto", "vibPolBajo"].forEach(id => el(id).addEventListener("change", e => {
@@ -2316,7 +2324,14 @@ const VIBR = (() => {
     pintar();
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
-  return { deLinea, estado: () => ({ ...st }) };
+  /* el Arduino mandó BOOT: se reinició. Si fue con el vibrador prendido, casi siempre es ruido del motor */
+  function reinicio(){
+    const conVib = st.on === 1 || Date.now() - st.tBoton < 15000;
+    st.on = null; st.t = 0;
+    if(conVib) msg("⚠ El Arduino de la rueda SE REINICIÓ al usar el vibrador. Es eléctrico: el motor mete ruido o baja el voltaje. Pon un diodo (1N4007) en paralelo al motor, aliméntalo con una fuente aparte (no del Arduino) y une los GND.", true);
+    pintar();
+  }
+  return { deLinea, reinicio, estado: () => ({ ...st }) };
 })();
 window.VIBR = VIBR;
 
