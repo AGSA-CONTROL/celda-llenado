@@ -63,7 +63,8 @@
              JOG:±<deg> GOTO_ST:<0-3> GOTO_DEG:<idx>:<deg> FORZ:<tag>:<0|1> POS? TARA CAL:<g>
              ACT_EXT ACT_RET ACT_GIRO:<ms> ACT_STOP (actuador E3 de 360°)
              ? E2?  (sensor E2 del dispensador) · DISP_FIN[:tolva] (fin de dispensado: vibra T_VIB_EXTRA_MS y da el OK de Llenado)
-             VIB:1 / VIB:0 (motor vibrador) · AGV:1 / AGV:0 (el carro puede o no recibir vasos)
+             VIB:1 / VIB:0 (motor vibrador, responde VIB,on,alto,paro) · VIB? · VIB_POL:1|0 (enciende con HIGH|LOW, se guarda)
+             AGV:1 / AGV:0 (el carro puede o no recibir vasos)
    Respuestas extra: READY · E2,0|1 · VERIF,<tolva>,<1 bueno|0 rechazo> · CAIDA,<tolva> · TAPA_FIN
    ============================================================================ */
 
@@ -249,6 +250,14 @@ bool okLlenadoPend = false;                  // el OK de Llenado espera a que te
 bool agvListo = true;                        // AGV:1 / AGV:0 desde el HMI: ¿el carro puede recibir vasos?
 bool motorDcHecho = false;    // este vaso ya terminó de dispensar: no volver a encender hasta que llegue otro
 unsigned long motorDcT0 = 0;
+/* VIBRADOR: con qué señal enciende el relé/driver del pin 4 (se cambia desde el HMI y se guarda).
+   true = HIGH enciende (driver/transistor) · false = LOW enciende (módulo de relé activo en bajo) */
+bool vibAlto = MOTOR_DC_ACT_ALTO;
+const int      EE_VIB_BASE  = 100;               // después del actuador (64)
+const uint16_t EE_VIB_MAGIC = 0xB1B0;
+struct CfgVib { uint16_t magic; uint8_t alto; };
+void cargarVib(){ CfgVib c; EEPROM.get(EE_VIB_BASE, c); if(c.magic == EE_VIB_MAGIC && c.alto <= 1) vibAlto = (c.alto == 1); }
+void guardarVib(){ CfgVib c = { EE_VIB_MAGIC, (uint8_t)(vibAlto ? 1 : 0) }; EEPROM.put(EE_VIB_BASE, c); }
 
 /* ---- Resultados de verificación pendientes de enviar (VERIF,tolva,ok) ---- */
 uint8_t verifCola[8];           // VERIF: bit 7 = bueno, bits 0-3 = tolva · CAIDA: 0x40 | tolva · TAPA_FIN: 0x20
@@ -278,6 +287,7 @@ void setup(){
 
   pinMode(PIN_V1, OUTPUT); pinMode(PIN_V2, OUTPUT); pinMode(PIN_V3, OUTPUT);
   pinMode(PIN_SERVO_TAPA, OUTPUT); pinMode(PIN_DESVIADOR, OUTPUT);
+  cargarVib();                                  // con qué señal enciende el vibrador (guardado)
   pinMode(PIN_MOTOR_DC, OUTPUT);
   digitalWrite(PIN_V1, LOW); digitalWrite(PIN_V2, LOW); digitalWrite(PIN_V3, LOW);
   digitalWrite(PIN_SERVO_TAPA, LOW); digitalWrite(PIN_DESVIADOR, LOW);
@@ -298,9 +308,16 @@ void setup(){
 }
 
 void motorDc(bool on){
-  digitalWrite(PIN_MOTOR_DC, (on == MOTOR_DC_ACT_ALTO) ? HIGH : LOW);
+  digitalWrite(PIN_MOTOR_DC, (on == vibAlto) ? HIGH : LOW);
   if(on && !motorDcOn) motorDcT0 = millis();
   motorDcOn = on;
+}
+/* VIB,<encendido 0|1>,<enciende con HIGH 0|1>,<bloqueado por paro 0|1> -> el HMI muestra el estado real */
+void enviarVib(){
+  while(txLen) drenarTx();                      // no se mezcla con una trama GIN a medias
+  Serial.print(F("VIB,")); Serial.print(motorDcOn ? 1 : 0);
+  Serial.print(','); Serial.print(vibAlto ? 1 : 0);
+  Serial.print(','); Serial.println(estado == ST_ESTOP ? 1 : 0);
 }
 
 void habilitarMotor(bool on){
@@ -808,7 +825,7 @@ void cmdParo(){
   limpiarVasos();
   digitalWrite(PIN_DESVIADOR, LOW); desviadorActivo = false; tDesv = -1;
   valvulaActiva = 0;
-  motorDc(false); vibFinHasta = 0; okLlenadoPend = false;
+  { bool estaba = motorDcOn; motorDc(false); vibFinHasta = 0; okLlenadoPend = false; if(estaba) enviarVib(); }
   actGirar(0); actGiroManual = false;            // el actuador se detiene donde esté
   if(actEstado == ACT_HACIA_ACTIVO){                              // quedó a medio camino: regresará solo lo que avanzó
     actRegresoMs = (unsigned long)((millis() - actT0) * (float)T_ACT_IDA_MS / T_ACT_REGRESO_MS);
@@ -920,8 +937,14 @@ void procesarLinea(char* l){
   else if(!strcmp(l,"MODO:AUTO"))   cmdModo(true);
   else if(!strcmp(l,"MODO:MANUAL")) cmdModo(false);
   else if(!strcmp(l,"OK_LLENADO")) { motorDc(false); motorDcHecho = true; vibFinHasta = 0; okLlenadoPend = false; cmdOk(1); }
-  else if(!strcmp(l,"VIB:1"))      { if(estado != ST_ESTOP){ motorDc(true); vibFinHasta = 0; } }   // empieza a dispensar
-  else if(!strcmp(l,"VIB:0"))      { motorDc(false); vibFinHasta = 0; }
+  else if(!strcmp(l,"VIB:1"))      { if(estado != ST_ESTOP){ motorDc(true); vibFinHasta = 0; } enviarVib(); }   // empieza a dispensar (o botón del HMI)
+  else if(!strcmp(l,"VIB:0"))      { motorDc(false); vibFinHasta = 0; enviarVib(); }
+  else if(!strcmp(l,"VIB?"))       enviarVib();
+  else if(!strcmp(l,"VIB_POL:1") || !strcmp(l,"VIB_POL:0")){       // con qué señal enciende el relé/driver
+    vibAlto = (l[8] == '1'); guardarVib();
+    motorDc(motorDcOn);                         // aplica la nueva lógica al estado actual
+    enviarVib();
+  }
   else if(!strcmp(l,"AGV:1"))      agvListo = true;
   else if(!strcmp(l,"AGV:0"))      agvListo = false;
   else if(!strcmp(l,"DISP_FIN"))   cmdDispFin(0);
@@ -1038,19 +1061,20 @@ void vigilarE2(){
     e2Estado = e2Candidato;
     e2Pendiente = true;
     if(!e2Estado){                                  // el vaso se fue: vibrador apagado y listo para el siguiente
-      if(vibFinHasta == 0) motorDc(false);          // (si está en la vibración extra la deja terminar)
+      if(vibFinHasta == 0 && motorDcOn){ motorDc(false); enviarVib(); }   // (si está en la vibración extra la deja terminar)
       motorDcHecho = false;
     }                                               // v13: al LLEGAR el vaso ya no vibra; vibra con VIB:1 (al dispensar)
   }
   if(vibFinHasta != 0 && (long)(millis() - vibFinHasta) >= 0){   // terminó la vibración extra
     vibFinHasta = 0;
-    motorDc(false);
+    motorDc(false); enviarVib();
     if(okLlenadoPend){ okLlenadoPend = false; cmdOk(1); }        // ahora sí: OK de Llenado, la rueda puede girar
   }
   if(motorDcOn && millis() - motorDcT0 >= T_MOTOR_DC_MAX_MS){   // seguridad por tiempo
     motorDc(false); motorDcHecho = true; vibFinHasta = 0;
     if(okLlenadoPend){ okLlenadoPend = false; cmdOk(1); }
     Serial.println(F("ALERTA,MOTOR_DC_TIMEOUT"));
+    enviarVib();
   }
 }
 /* DISP_FIN: el dispensador terminó con este vaso -> motor DC OFF y OK de Llenado automático */

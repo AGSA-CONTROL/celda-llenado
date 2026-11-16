@@ -601,6 +601,21 @@ details summary:hover{color:var(--text)}
 #viewDisp .vtTiempo b{color:inherit}
 #viewDisp .vtMas{margin-top:8px}
 #viewDisp .vtGuardarGrande{width:100%;margin-top:10px;font-size:16px}
+#viewDisp .vibCard{margin-top:18px;padding:14px 16px;border:1px solid var(--border2);border-radius:12px;background:var(--inset);max-width:520px}
+#viewDisp .vibHead{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+#viewDisp .vibHead h3{margin:0;font-size:16px}
+#viewDisp .vibPill{margin-left:auto;font-size:12px;font-weight:800;letter-spacing:.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);color:var(--muted)}
+#viewDisp .vibPill.on{color:#06210f;background:var(--green);border-color:var(--green);animation:vibPulso .25s linear infinite alternate}
+#viewDisp .vibPill.off{color:var(--text)}
+@keyframes vibPulso{from{transform:translateX(-1px)}to{transform:translateX(1px)}}
+#viewDisp .vibBtn{width:100%;min-height:52px;font-size:17px;font-weight:800;border-radius:12px;border:2px solid var(--green);background:rgba(51,196,105,.14);color:var(--text);cursor:pointer;margin:6px 0 10px}
+#viewDisp .vibBtn.on{border-color:var(--red);background:rgba(229,72,77,.16)}
+#viewDisp .vibBtn:disabled{opacity:.45;cursor:not-allowed}
+#viewDisp .vibPol{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:14px}
+#viewDisp .vibPol label{display:flex;gap:6px;align-items:center;cursor:pointer}
+#viewDisp .vibNota{margin-top:8px;font-size:12px}
+#viewDisp .vibMsg{font-size:13px;margin-top:4px;min-height:16px;color:var(--muted)}
+#viewDisp .vibMsg.warn{color:var(--yellow);font-weight:700}
 #viewDisp .vtMas summary{cursor:pointer;color:var(--tenue);font-weight:700;margin-bottom:6px}
 #viewDisp .b-gira{background: #2e9e4f; border-color: #2e9e4f; color: #fff; font-weight: 700; min-height: 46px;}
 #viewDisp .b-gira:hover:not(:disabled){background: #37b25c;}
@@ -1155,6 +1170,18 @@ window.ALM_PEDIDO = {};
       <input type="number" id="dsp-vtPausa" min="0" max="10000" step="100" hidden><button id="dsp-vtLeer" type="button" hidden>Leer</button>
       <button id="dsp-vtGuardar" class="b-gira vtGuardarGrande" type="button">💾 Guardar en el Arduino</button>
       <div class="cfg" id="dsp-vtInfo">Aún no se lee la calibración del Arduino.</div>
+      <div class="vibCard" id="vibCard">
+        <div class="vibHead"><h3>Vibrador</h3><span class="vibPill" id="vibPill">SIN CONEXIÓN</span></div>
+        <p class="ayuda">Motor vibrador del <b>pin 4 del Arduino de la rueda</b>. Préndelo y apágalo las veces que quieras para probarlo. Solo con la máquina en reposo: durante un pedido se prende solo al dispensar.</p>
+        <button type="button" class="vibBtn" id="vibBtn" disabled>▶ Encender vibrador</button>
+        <div class="vibPol">
+          <span>El relé / driver enciende con:</span>
+          <label><input type="radio" name="vibPol" value="1" id="vibPolAlto"> Señal ALTA (HIGH)</label>
+          <label><input type="radio" name="vibPol" value="0" id="vibPolBajo"> Señal BAJA (LOW)</label>
+        </div>
+        <p class="ayuda vibNota">Si el vibrador hace lo contrario (vibra cuando dice APAGADO), cambia a la otra señal. Se guarda en el Arduino. Por seguridad se apaga solo a los 60 s.</p>
+        <div class="vibMsg" id="vibMsg" aria-live="polite"></div>
+      </div>
     </section>
 
     <section class="grupo" id="dsp-panelSensores" role="tabpanel" aria-labelledby="dsp-tabSensores" hidden>
@@ -1534,6 +1561,10 @@ class SimGinebra{
     this.stGrados[idx] = q(g);   // cada estación guarda su propio ángulo (igual que el firmware)
   }
   gradosLinea(){ return "GRADOS," + this.stGrados.map(g => Math.round(g*100)).join(",") + "," + PASOS_REV_SIM; }
+  vibLinea(){
+    if(this.vibAlto == null){ try{ const v = localStorage.getItem("hmi01_simVibAlto"); this.vibAlto = v === "0" ? 0 : 1; }catch(_){ this.vibAlto = 1; } }
+    return `VIB,${this.vib ? 1 : 0},${this.vibAlto},${this.d.estado === 4 ? 1 : 0}`;
+  }
   actLinea(){
     if(!this.act){ try{ this.act = JSON.parse(localStorage.getItem("hmi01_simAct2") || "null"); }catch(_){} }
     if(!this.act) this.act = { ida:1100, reg:1136, vel:90, sent:1 };
@@ -1713,7 +1744,7 @@ class SimGinebra{
         }
         break;
       case "PAUSA": if(d.estado === 1 || d.estado === 9){ this.prev = d.estado; d.estado = 3; } break;
-      case "PARO": if(d.estado !== 4){ this.prev = d.estado; d.estado = 4; this.valv = 0; this.servo = 0; } break;
+      case "PARO": if(d.estado !== 4){ this.prev = d.estado; d.estado = 4; this.valv = 0; this.servo = 0; if(this.vib){ this.vib = 0; this.emit(this.vibLinea()); } } break;
       case "RESET": { const f = d.f.slice(); this.reset(); this.d.f = f; } break;
       case "PASO":
         if(d.estado === 10){ d.estado = 2; this.idxT = this.cfg.tIndex; }   // modo manual: avanza una estación
@@ -1732,6 +1763,9 @@ class SimGinebra{
         if(d.estado === 1 || d.estado === 9){ this.ok[s] = true; if(d.estado === 9) this.evaluar(); }
       } break;
       case "AGV": this.agvOk = arg === "1"; if(d.estado === 1 || d.estado === 9) this.evaluar(); break;
+      case "VIB": if(arg === "1"){ if(d.estado !== 4) this.vib = 1; } else if(arg === "0") this.vib = 0; this.emit(this.vibLinea()); break;
+      case "VIB?": this.emit(this.vibLinea()); break;
+      case "VIB_POL": this.vibAlto = arg === "1" ? 1 : 0; try{ localStorage.setItem("hmi01_simVibAlto", String(this.vibAlto)); }catch(_){} this.emit(this.vibLinea()); break;
       case "SPEED": { const v = Number(arg); if(v >= 10 && v <= 100){ this.cfg.tIndex = duracionIndexado(v); this.speed = 1; } } break;
       case "FORZ": { const [tag, v] = arg.split(":"); if(tag in this.forz) this.forz[tag] = v === "1" ? 1 : 0; } break;
       case "CFG": {
@@ -2008,6 +2042,7 @@ function alLinea(k, linea){
   logCtl(k, "RX", linea);
   if(k === "gin" && linea.startsWith("GRADOS,")){ onGrados(linea); return; }
   if(k === "gin" && linea.startsWith("ACT_T,")){ onActT(linea); return; }
+  if(k === "gin" && linea.startsWith("VIB,")){ if(window.VIBR) VIBR.deLinea(linea); return; }
   if(k === "gin" && linea === "ERR,ACT_T"){ ACT.guardando = false; actAviso("✖ El Arduino no aceptó los tiempos (el actuador debe estar en reposo).", true); return; }
   if(k === "gin"){
     const d = parseGIN(linea);
@@ -2222,6 +2257,71 @@ function qcDeFrame(d, p){
     q.s3 = false;
   }
 }
+/* ===== VIBRADOR (pestaña Dispensado › Calibrar): encender / apagar a mano y elegir la señal del relé =====
+   Órdenes a la rueda: VIB:1 · VIB:0 · VIB? · VIB_POL:1|0 → responde VIB,<encendido>,<HIGH enciende>,<paro> */
+const VIBR = (() => {
+  const st = { on:null, alto:null, paro:0, pidio:null, pidioPol:null, t:0 };
+  const el = id => document.getElementById(id);
+  let msgAuto = false;                                    // mensaje puesto por pintar() (se borra solo)
+  const msg = (t, warn, auto) => { const m = el("vibMsg"); if(m){ m.textContent = t || ""; m.className = "vibMsg" + (warn ? " warn" : ""); } msgAuto = !!auto; };
+  const ocupado = () => (window.DISP && DISP.loteActivo && DISP.loteActivo()) ? true : false;
+  function pintar(){
+    const b = el("vibBtn"), p = el("vibPill"); if(!b || !p) return;
+    const con = typeof CTL !== "undefined" && CTL.gin.conectado;
+    if(!con){ st.on = null; }
+    b.disabled = !con || H.estop || ocupado();
+    b.classList.toggle("on", st.on === 1);
+    b.textContent = st.on === 1 ? "■ Apagar vibrador" : "▶ Encender vibrador";
+    p.textContent = !con ? "SIN CONEXIÓN" : st.on === 1 ? "VIBRANDO" : st.on === 0 ? "APAGADO" : "—";
+    p.className = "vibPill" + (st.on === 1 ? " on" : st.on === 0 ? " off" : "");
+    if(st.alto != null){ el("vibPolAlto").checked = st.alto === 1; el("vibPolBajo").checked = st.alto === 0; }
+    if(!con) msg("Conecta la rueda (pestaña Comunicación) para usar el vibrador.", false, true);
+    else if(H.estop) msg("Paro de emergencia activo: el vibrador no enciende.", true, true);
+    else if(ocupado()) msg("Hay un lote corriendo: el vibrador se maneja solo al dispensar.", false, true);
+    else if(msgAuto) msg("");
+  }
+  function mandar(cmd){ if(typeof CTL === "undefined" || !CTL.gin.conectado){ pintar(); return false; } enviarCtl("gin", cmd); return true; }
+  function deLinea(l){
+    const v = l.split(",").map(Number);
+    const antes = st.on;
+    st.on = v[1] ? 1 : 0; st.alto = v[2] ? 1 : 0; st.paro = v[3] ? 1 : 0;
+    if(st.pidio !== null){
+      if(st.pidio === 1 && st.on !== 1) msg(st.paro ? "No enciende: el paro de emergencia está activo." : "El Arduino no encendió el vibrador.", true);
+      else msg(st.on ? "✔ El Arduino encendió el vibrador (pin 4 " + (st.alto ? "en HIGH" : "en LOW") + "). Si no se mueve, revisa la conexión o cambia la señal abajo." : "✔ Vibrador apagado.");
+      st.pidio = null;
+    } else if(st.pidioPol != null){
+      msg(st.alto === st.pidioPol ? "✔ Guardado en el Arduino: el vibrador enciende con señal " + (st.alto ? "ALTA (HIGH)." : "BAJA (LOW).") : "El Arduino no guardó la señal.", st.alto !== st.pidioPol);
+      st.pidioPol = null;
+    } else if(antes === 1 && st.on === 0) msg(H.estop ? "Paro de emergencia: el vibrador se apagó." : "El vibrador se apagó solo (fin del dispensado, se quitó el vaso o pasaron 60 s).", !!H.estop);
+    pintar();
+  }
+  function iniciar(){
+    const b = el("vibBtn"); if(!b) return;
+    b.addEventListener("click", () => {
+      const quiere = st.on === 1 ? 0 : 1;
+      st.pidio = quiere;
+      msg(quiere ? "Encendiendo…" : "Apagando…");
+      mandar("VIB:" + quiere);
+      setTimeout(() => { if(st.pidio !== null){ st.pidio = null; msg("La rueda no contestó. Sube el programa nuevo de la rueda (Arduino_Rueda_v17) para ver el estado del vibrador.", true); } }, 1500);
+    });
+    ["vibPolAlto", "vibPolBajo"].forEach(id => el(id).addEventListener("change", e => {
+      if(!e.target.checked) return;
+      st.pidioPol = Number(e.target.value);
+      msg("Guardando en el Arduino: el relé enciende con " + (e.target.value === "1" ? "HIGH" : "LOW") + "…");
+      mandar("VIB_POL:" + e.target.value);
+    }));
+    setInterval(() => {
+      const con = typeof CTL !== "undefined" && CTL.gin.conectado;
+      if(con && st.on === null && Date.now() - st.t > 2000){ st.t = Date.now(); mandar("VIB?"); }   // pregunta el estado al conectar
+      pintar();
+    }, 700);
+    pintar();
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
+  return { deLinea, estado: () => ({ ...st }) };
+})();
+window.VIBR = VIBR;
+
 /* ======================================================================
    VOZ DEL HMI · audios de la carpeta /audio/ (solo suenan en este HMI)
    - Un solo elemento Audio reutilizado, desbloqueado en el clic de "Iniciar sesión".
