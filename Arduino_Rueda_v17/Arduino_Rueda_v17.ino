@@ -1108,7 +1108,7 @@ void vigilarE2(){
   bool lectura = sensorF1();
   if(lectura != e2Candidato){ e2Candidato = lectura; e2TCambio = millis(); }
   // con el vibrador prendido la rueda está quieta: un "ya no hay vaso" corto es parpadeo por la vibración
-  if(e2Candidato != e2Estado && millis() - e2TCambio >= ((!e2Candidato && motorDcOn) ? E2_SALIDA_MS : E2_ANTIRREBOTE_MS)){
+  if(e2Candidato != e2Estado && millis() - e2TCambio >= ((!e2Candidato && motorDcOn && !vibManual) ? E2_SALIDA_MS : E2_ANTIRREBOTE_MS)){
     e2Estado = e2Candidato;
     e2Pendiente = true;
     if(!e2Estado){                                  // el vaso se fue: vibrador apagado y listo para el siguiente

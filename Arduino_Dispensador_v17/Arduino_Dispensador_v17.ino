@@ -100,10 +100,6 @@ const unsigned long T_MOVER_MS = 400;                // tiempo que le damos al s
 const unsigned long ESPERA_CAIDA_MS = 3000;     // AJUSTAR: al terminar de girar, espera este tiempo a que termine de caer
                                                 // el producto y SOLO ENTONCES avisa PEDIDO_OK / CICLO_OK (la rueda avanza)
 const unsigned long ESPERA_RECIPIENTE_MS = 1500; // al llegar un recipiente, espera este tiempo antes de dispensar (evita derrame)
-/* Un recipiente YA LLENO solo cuenta como retirado si el sensor deja de verlo este tiempo seguido.
-   Si "regresa" antes (parpadeo por la vibración) es el MISMO recipiente: no se le sirve otra porción. */
-const unsigned long VASO_RETIRADO_MS = 250;
-unsigned long tSinVaso = 0;                     // desde cuándo E2 dice "no hay recipiente"
 const uint8_t LOTE = 3;                         // unidades por pedido
 
 // ---- Sensores ----
@@ -415,10 +411,6 @@ void continuar() {                              // sigue donde se había quedado
   avisoTodos();
 }
 
-void revisarRetiro() {                          // el recipiente lleno ya no está desde hace VASO_RETIRADO_MS: ahora sí se retiró
-  if (soltarVasoFlag && !vaso && millis() - tSinVaso >= VASO_RETIRADO_MS) soltarVasoFlag = false;
-}
-
 void revisarReanudar() {                        // tras un corte por falta de recipiente: sigue cuando el nuevo ya está asentado
   if (!emergencia && estado == SIN_VASO && vaso && millis() - tVaso >= ESPERA_RECIPIENTE_MS) continuar();
 }
@@ -429,10 +421,9 @@ void fijarVaso(bool on) {                       // ÚNICA entrada del sensor E2 
   if (cambio && on) tVaso = millis();           // arranca el tiempo de asentamiento
   if (on) Serial.println(F("E2,1")); else Serial.println(F("E2,0"));
   if (!cambio) return;
-  if (on && soltarVasoFlag) { vasoArmado = false; return; }   // regresó el MISMO recipiente lleno (parpadeo): no se vuelve a llenar
   vasoArmado = on;                              // solo una pulsación (flanco de subida) habilita el arranque
   if (!on) {
-    tSinVaso = millis();                        // el recipiente lleno se da por retirado en revisarRetiro()
+    soltarVasoFlag = false;                     // ya retiraron el recipiente
     if (!emergencia && (estado == GIRANDO || estado == ESPERA_GIRO || estado == ENTRE)) {   // se quitó a media dispensada
       pausar(SIN_VASO);
       svEst[activo] = S_ESPERA;
@@ -624,7 +615,6 @@ void loop() {
   reportarSensores();
   actualizarServo();
   actualizarManual();
-  revisarRetiro();
   revisarInicio();
   revisarReanudar();
 }
