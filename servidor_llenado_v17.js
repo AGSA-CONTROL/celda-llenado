@@ -230,7 +230,7 @@ const enviar = (ws, o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringif
 const avisarVistas = (S, o) => S.vistas.forEach(v => enviar(v, o));
 const avisarTiendas = S => S.tiendas.forEach(t => enviar(t, { tipo: "hmi", en_linea: !!S.hmi }));
 const avisarHmi = S => enviar(S.hmi, { tipo: "tiendas", n: S.tiendas.size });
-const CTL_VISTA = ["paro", "salir", "modoDest", "vel", "modoSim"];   // lo que una vista puede pedirle al carro
+const CTL_VISTA = ["paro", "salir", "modoDest", "vel", "modoSim", "home"];   // lo que una vista puede pedirle al carro
 const AGV_A_HMI = ["agv_estado", "agv_evento"];     // la página del AGV solo puede mandar esto al HMI
 const idValido = id => typeof id === "string" && /^[\w-]{1,40}$/.test(id);
 const LOCALES = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];

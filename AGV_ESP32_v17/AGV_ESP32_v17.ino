@@ -1609,6 +1609,18 @@ void carroAlLlegar(int idx) {
   iniciarSecuenciaRampa();
 }
 
+// ---------- ⌂ HOME: regresar a la posición de carga (botón de la página del carro) ----------
+bool carroHome() {
+  if (carroEstado == CARRO_CARGA) { Serial.println(F("Carro: ya está en la posición de carga (HOME).")); return false; }
+  if (carroEstado == CARRO_DESCARGANDO) { Serial.println(F("Carro: está descargando; al terminar regresa solo.")); return false; }
+  carroPausado = false;
+  carroEstado = CARRO_REGRESANDO;          // sigue la línea hasta QR-HOME (los QR de los almacenes son de paso)
+  carroIrA(0);
+  Serial.println(F("Carro: regresando a la posición de carga (HOME)."));
+  enviarTelemetria();
+  return true;
+}
+
 // ---------- la rampa terminó de descargar (lo llama actualizarRampa) ----------
 void carroTrasDescarga() {
   if (carroDestino >= 1 && carroDestino <= 3) carroEntregas[carroDestino - 1]++;
@@ -1764,6 +1776,7 @@ void procesarServidor(uint8_t* payload, size_t length) {
     else if (strcmp(c, "modoDest") == 0) carroElegirDest((int)(doc["v"] | 0));
     else if (strcmp(c, "vel") == 0)      carroVelPct = constrain((int)(doc["v"] | 60), 20, 100);
     else if (strcmp(c, "modoSim") == 0)  cambiarModoSim(doc["on"] | false);
+    else if (strcmp(c, "home") == 0)     carroHome();
     enviarTelemetria();
   } else if (strcmp(tipo, "agv_cmd") == 0) {
     const char* cmd = doc["cmd"] | "";

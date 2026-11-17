@@ -129,6 +129,10 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 #svg .qrE.leido rect.fondo{fill:#f5a623}
 #svg .qrE.leido text{fill:#f5a623}
 .destBtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.destBtns button.homeBtn{grid-column:1/-1;padding:10px 4px;border-color:var(--blue,#4ea1ff);color:var(--text)}
+.destBtns button.homeBtn small{display:inline;margin:0 0 0 8px}
+.destBtns button.homeBtn.on{border-color:var(--blue,#4ea1ff);background:rgba(78,161,255,.16);color:var(--blue,#4ea1ff)}
+.destBtns button.homeBtn:disabled{opacity:.45;cursor:not-allowed}
 .destBtns.pide button{animation:pide 1s ease-in-out infinite}
 @keyframes pide{50%{border-color:var(--yellow);box-shadow:0 0 14px rgba(245,166,35,.55)}}
 .destBtns button{padding:14px 4px;border-radius:10px;border:2px solid var(--border2);background:var(--inset);font-weight:800;font-size:15px;cursor:pointer;line-height:1.15}
@@ -303,6 +307,7 @@ pre.proto{max-height:none}
           <button type="button" data-d="1">Almacén 1<small>QR-E1</small></button>
           <button type="button" data-d="2">Almacén 2<small>QR-E2</small></button>
           <button type="button" data-d="3">Almacén 3<small>QR-E3</small></button>
+          <button type="button" id="btnHomeCarro" class="homeBtn" title="Regresar el carro a la posición de carga">⌂ Regresar a HOME<small>QR-HOME</small></button>
         </div>
         <select id="modoDest" hidden><option value="0">Sin elegir</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
         <div class="paso"><span class="pnum">2</span>Mueve el carro</div>
@@ -657,6 +662,24 @@ function paro(on){
   log(on ? "⛔ Carro detenido." : "▶ El carro continúa.");
   render(); publicar(true);
 }
+/* ⌂ HOME: el carro regresa a la posición de carga (QR-HOME) siguiendo la línea, sin descargar */
+function irHome(){
+  if(!MODO_SIM){
+    const e = ESP.tel && ESP.tel.estado;
+    if(e === "DESCARGANDO"){ toast("Está descargando: al terminar regresa solo a HOME."); return; }
+    const nv = ESP.tel ? (Array.isArray(ESP.tel.vasos) ? ESP.tel.vasos.length : Number(ESP.tel.vasos) || 0) : 0;
+    if(nv > 0 && !confirm("El carro trae vasos que no ha entregado. ¿Regresarlo a HOME de todos modos?")) return;
+    ctl("home"); log("⌂ Orden enviada: regresar a la posición de carga (HOME)."); return;
+  }
+  if(st.estado === "CARGA" || st.estado === "ESPERA_DESTINO"){ toast("El carro ya está en la posición de carga (HOME)."); return; }
+  if(st.estado === "DESCARGANDO"){ toast("Está descargando: al terminar regresa solo a HOME."); return; }
+  if(st.vasos.length && !confirm("El carro trae vasos que no ha entregado. ¿Regresarlo a HOME de todos modos?")) return;
+  st.pausado = false;
+  if(st.estado === "EN_ESTACION") st.prev = "REGRESANDO";           // estaba leyendo un QR: sigue hacia HOME
+  else { st.prev = "REGRESANDO"; st.estado = "REGRESANDO"; }
+  log("⌂ Regresando a la posición de carga (HOME) por la línea.");
+  render(); publicar(true);
+}
 /* pasos del viaje que cambian el estado y avisan al HMI */
 function leerQr(n){ if(st.lote) st.lote.destino = n; log(`🔳 QR leído: Almacén ${n}.`); st.estado = "A_ALMACEN"; evento("qr"); }
 /* v17: paradas del circuito en orden (cada almacén tiene su QR; HOME al final de la vuelta) */
@@ -996,7 +1019,7 @@ function render(){
     $("#vCarro").hidden = t.dataset.v !== "vCarro"; $("#vComm").hidden = t.dataset.v !== "vComm";
   }));
   $("#modoDest").value = cfg.modo; $("#vel").value = cfg.vel;
-  $$("#destBtns button").forEach(b => b.addEventListener("click", () => {
+  $$("#destBtns button[data-d]").forEach(b => b.addEventListener("click", () => {
     const sel = $("#modoDest"); sel.value = b.dataset.d; sel.dispatchEvent(new Event("change"));
     toast(`El lote irá al Almacén ${b.dataset.d}`);
   }));
@@ -1019,6 +1042,7 @@ function render(){
   $("#btnEnviar").addEventListener("click", () => {
     if(!SRV.hmi || confirm("¿Enviar el carro ahora? Si la rueda está armando un lote, los vasos que falten caerán al piso.")) salir({ id:null, p:null });
   });
+  $("#btnHomeCarro").addEventListener("click", irHome);
   $("#btnParo").addEventListener("click", () => paro(!st.pausado));
   $("#btnParo2").addEventListener("click", () => paro(!st.pausado));
   $("#srvDir").value = location.protocol.startsWith("http") ? location.host : cfg.srv;

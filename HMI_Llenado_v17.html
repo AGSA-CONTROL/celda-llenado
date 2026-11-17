@@ -2910,8 +2910,6 @@ function renderGin(){
   const btnHome = $("#btnHome");
   btnHome.disabled = !CTL.gin.conectado || g.estado === 6 || g.estado === 7;
   btnHome.textContent = g.estado === 6 ? "⌂ Buscando…" : "⌂ Buscar home";
-  document.querySelectorAll("[data-home]").forEach(b => { b.disabled = btnHome.disabled; b.textContent = btnHome.textContent; });
-  document.querySelectorAll(".homeTxt").forEach(t => { t.textContent = g.estado === 6 ? "buscando…" : g.homed ? "✔ home encontrado" : "busca el sensor"; });
   const I = (t, s, on, cls) => `<div class="ind ${on ? (cls || "on") : ""}">${t}<small>${s}</small></div>`;
   const vasoA = g.cups[g.n] !== "-", vasoB = g.cups[(g.n + 2) % 4] !== "-";   // cada orificio con su vaso
   // resalta el botón de confirmación que la rueda está esperando
@@ -2963,19 +2961,13 @@ function renderGin(){
 const NOMBRES_EST_CAL = ["E0 · Entrada (home: orificio A)","E1 · Llenado","E2 · Tapado","E3 · Verificación"];
 const CAL_ST = cargarGradosCompartidos();   // valores mostrados en el formulario (persisten entre sesiones)
 function construirCal(){
-  const filaHome = `
-    <div class="row" style="margin-bottom:10px">
-      <label class="tag" style="flex:1 1 150px">⌂ HOME · final de carrera</label>
-      <span class="homeTxt" style="max-width:100px;flex:0 0 100px;font-size:12px;color:var(--muted)">busca el sensor</span>
-      <button class="btn sm yellow" data-home="1" type="button">⌂ Buscar home</button>
-    </div>`;
-  $("#calStList").innerHTML = filaHome + NOMBRES_EST_CAL.map((nom, i) => `
+  $("#calStList").innerHTML = NOMBRES_EST_CAL.map((nom, i) => `
     <div class="row" style="margin-bottom:10px">
       <label class="tag" style="flex:1 1 150px">${nom}</label>
       <input id="calSt${i}" type="number" min="0" max="360" step="0.1" value="${CAL_ST[i]}" style="max-width:100px">
       <button class="btn sm" data-cal="${i}" type="button">Enviar SET_ST${i}</button>
     </div>`).join("");
-  $("#moveDegList").innerHTML = filaHome + NOMBRES_EST_CAL.map((nom, i) => `
+  $("#moveDegList").innerHTML = NOMBRES_EST_CAL.map((nom, i) => `
     <div class="row" style="margin-bottom:10px">
       <label class="tag" style="flex:1 1 150px">${nom}</label>
       <input id="moveDeg${i}" type="number" min="0" max="360" step="0.1" placeholder="grados" style="max-width:100px">
@@ -3098,12 +3090,6 @@ $$(".nav").forEach(b => b.addEventListener("click", () => showView(b.dataset.vie
 // ginebra
 $("#btnPaso").addEventListener("click", () => enviarCtl("gin", "PASO"));
 $("#btnHome").addEventListener("click", () => { if(H.qc) H.qc.contar = false; enviarCtl("gin", "HOME"); toast("Buscando home del motor de la rueda…"); });
-/* el mismo HOME desde la pestaña Calibración (filas "⌂ HOME" de las estaciones) */
-document.addEventListener("click", e => {
-  const b = e.target.closest("[data-home]"); if(!b || b.disabled) return;
-  if(!CTL.gin.conectado){ toast("Conecta la rueda (pestaña Comunicación) para buscar el home."); return; }
-  if(H.qc) H.qc.contar = false; enviarCtl("gin", "HOME"); toast("Buscando home del motor de la rueda…");
-});
 $("#btnJogNeg").addEventListener("click", () => enviarCtl("gin", "JOG:-" + ($("#jogInc").value || "1.0")));
 $("#btnJogPos").addEventListener("click", () => enviarCtl("gin", "JOG:+" + ($("#jogInc").value || "1.0")));
 $("#btnResetRech").addEventListener("click", () => {
