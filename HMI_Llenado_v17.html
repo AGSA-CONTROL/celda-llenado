@@ -1361,6 +1361,23 @@ window.ALM_PEDIDO = {};
             </div>
             <div class="actInfo" id="actInfo">Conecta la rueda para leer los tiempos guardados.</div>
           </section>
+          <section class="grp wide" id="tapaPanel">
+            <h3>Servo de tapas (dispensador de tapas · servo de 360°)</h3>
+            <div class="viewHeader" style="padding:0 0 10px">El servo de tapas gira hasta que el sensor <b>I2 (pin 9)</b> ve la tapa y ahí se para. Aquí calibras <b>qué tan rápido gira</b>: si la tapa se pasa o se atora, bájale; si tarda mucho, súbele. Pulsa <b>"Probar giro"</b> para verlo y luego <b>"Guardar en el Arduino"</b>.</div>
+            <div class="actGrid">
+              <div class="actFila"><span>Velocidad <small class="actSub">(10% = muy lento · 100% = máxima)</small></span>
+                <button class="btn sm" type="button" data-tv="-5">−</button><input type="number" id="tapaVel" min="10" max="100" step="5" value="80"><em>%</em><button class="btn sm" type="button" data-tv="5">+</button>
+                <button class="btn sm green" type="button" id="tapaProbar">▶ Probar giro</button></div>
+              <div class="actFila"><span>Sentido</span>
+                <label class="actSent" style="grid-column:2/6"><input type="checkbox" id="tapaSent"> Invertir sentido de giro</label></div>
+            </div>
+            <div class="actBotones">
+              <button class="btn red" type="button" id="tapaStop">■ Detener</button>
+              <button class="btn" type="button" id="tapaLeer">Leer del Arduino</button>
+              <button class="btn green" type="button" id="tapaGuardar">💾 Guardar en el Arduino</button>
+            </div>
+            <div class="actInfo" id="tapaInfo">Conecta la rueda para leer la velocidad guardada.</div>
+          </section>
         </div>
       </div>
 
@@ -1564,6 +1581,10 @@ class SimGinebra{
     this.stGrados[idx] = q(g);   // cada estación guarda su propio ángulo (igual que el firmware)
   }
   gradosLinea(){ return "GRADOS," + this.stGrados.map(g => Math.round(g*100)).join(",") + "," + PASOS_REV_SIM; }
+  tapaLinea(){
+    if(this.tapaUs == null){ try{ const v = Number(localStorage.getItem("hmi01_simTapaUs")); this.tapaUs = v >= 1000 && v <= 2000 ? v : 1100; }catch(_){ this.tapaUs = 1100; } }
+    return `TAPA_V,${this.tapaUs}`;
+  }
   rtLinea(){
     if(this.rt == null){ try{ const v = Number(localStorage.getItem("hmi01_simRt")); this.rt = v >= 500 && v <= 60000 ? v : 10000; }catch(_){ this.rt = 10000; } }
     return `ACT_RT,${this.rt}`;
@@ -1822,6 +1843,8 @@ class SimGinebra{
       } break;
       case "ACT_T?": this.emit(this.actLinea()); break;
       case "ACT_RT?": this.emit(this.rtLinea()); break;
+      case "TAPA_V?": this.emit(this.tapaLinea()); break;
+      case "TAPA_V": { const v = Number(arg); if(v >= 1000 && v <= 2000 && (v <= 1460 || v >= 1540)){ this.tapaUs = v; try{ localStorage.setItem("hmi01_simTapaUs", String(v)); }catch(_){} this.emit(this.tapaLinea()); } else this.emit("ERR,TAPA_V"); } break;
       case "ACT_RT": { const v = Number(arg); if(v >= 500 && v <= 60000){ this.rt = v; try{ localStorage.setItem("hmi01_simRt", String(v)); }catch(_){} this.emit(this.rtLinea()); } else this.emit("ERR,ACT_RT"); } break;
       case "ACT_CICLO": this.emit("ACT,ciclo"); break;
       case "ACT_T": {
@@ -2055,6 +2078,8 @@ function alLinea(k, linea){
   if(k === "gin" && linea.startsWith("GRADOS,")){ onGrados(linea); return; }
   if(k === "gin" && linea.startsWith("ACT_T,")){ onActT(linea); return; }
   if(k === "gin" && linea.startsWith("ACT_RT,")){ onActRt(linea); return; }
+  if(k === "gin" && linea.startsWith("TAPA_V,")){ onTapaV(linea); return; }
+  if(k === "gin" && linea === "ERR,TAPA_V"){ TAPA.guardando = false; tapaAviso("✖ El Arduino no aceptó esa velocidad.", true); return; }
   if(k === "gin" && linea === "ACT,ciclo"){ actVisual("ok"); return; }        // prueba del paso del vaso: también se ve en el dibujo
   if(k === "gin" && (linea === "ERR,ACT_RT" || linea === "ERR,ACT_CICLO")){ ACT.guardandoRt = false; actAviso(linea === "ERR,ACT_RT" ? "✖ El Arduino no aceptó el tiempo retraído (0.5 a 60 s)." : "✖ El actuador está ocupado: espera a que termine y vuelve a probar.", true); return; }
   if(k === "gin" && linea.startsWith("VIB,")){ if(window.VIBR) VIBR.deLinea(linea); return; }
@@ -2200,6 +2225,7 @@ async function conectar(k, modo){
     enviarCtl(k, "GRADOS?");
     enviarCtl(k, "ACT_T?");                      // tiempos del actuador lineal guardados
     enviarCtl(k, "ACT_RT?");                     // tiempo que se queda retraído
+    enviarCtl(k, "TAPA_V?");                     // velocidad del servo de tapas
     enviarCtl(k, "E2?");                         // firmware unido: pide el estado del sensor E2 (pin 8)
   }
   if(k === "disp" && window.DISP){
@@ -3156,6 +3182,42 @@ $("#actVel").addEventListener("input", e => $("#actVelTxt").textContent = e.targ
 $("#actProbarIda").addEventListener("click", () => { const x = actValores(); if(x) actProbar(x.ida); });
 $("#actProbarReg").addEventListener("click", () => { const x = actValores(); if(x) actProbar(-x.reg); });
 $("#actStop").addEventListener("click", () => { if(actListo()){ enviarCtl("gin", "ACT_STOP"); actAviso("Actuador detenido."); } });
+/* ===== Servo de tapas: velocidad (TAPA_V:<µs>, 1500 = parado; ±500 µs = 100 %) ===== */
+const TAPA = { us:1100, guardando:false, t:null };
+const tapaAviso = (t, mal) => { const e = $("#tapaInfo"); e.textContent = t; e.style.color = mal ? "var(--red)" : ""; };
+function tapaUsDePantalla(){
+  const pct = Math.round(+$("#tapaVel").value);
+  if(!(pct >= 10 && pct <= 100)){ tapaAviso("✖ La velocidad debe estar entre 10 y 100 %.", true); return null; }
+  const off = Math.max(40, Math.round(pct * 5));            // 100 % = 500 µs desde 1500
+  return $("#tapaSent").checked ? 1500 + off : 1500 - off;  // de fábrica gira con pulsos menores a 1500
+}
+function tapaPintar(){
+  const off = Math.abs(TAPA.us - 1500), pct = Math.round(off / 5);
+  $("#tapaVel").value = pct; $("#tapaSent").checked = TAPA.us > 1500;
+  tapaAviso(`Guardado en el Arduino: velocidad ${pct} %${TAPA.us > 1500 ? " · sentido invertido" : ""} (pulso ${TAPA.us} µs).`);
+}
+function onTapaV(l){
+  const v = Number(l.split(",")[1]); if(!(v >= 1000 && v <= 2000)) return;
+  TAPA.us = v; tapaPintar();
+  if(TAPA.guardando){ TAPA.guardando = false; clearTimeout(TAPA.t); tapaAviso("✔ " + $("#tapaInfo").textContent); }
+}
+function tapaListo(){ if(!CTL.gin.conectado){ tapaAviso("✖ La rueda no está conectada (pestaña Comunicación).", true); return false; } return true; }
+$$("[data-tv]").forEach(b => b.addEventListener("click", () => {
+  const inp = $("#tapaVel"); inp.value = Math.max(10, Math.min(100, Math.round(+inp.value || 0) + Number(b.dataset.tv)));
+}));
+$("#tapaProbar").addEventListener("click", () => {
+  if(!tapaListo()) return; const us = tapaUsDePantalla(); if(us == null) return;
+  if(us !== TAPA.us) enviarCtl("gin", `TAPA_V:${us}`);       // prueba con la velocidad de la pantalla (y la guarda)
+  enviarCtl("gin", "FORZ:SV1:1");
+  tapaAviso(`Girando al ${$("#tapaVel").value} %… se para cuando el sensor I2 ve la tapa (o a los 5 s). ¿Quedó bien la tapa?`);
+});
+$("#tapaStop").addEventListener("click", () => { if(tapaListo()){ enviarCtl("gin", "FORZ:SV1:0"); tapaAviso("Servo de tapas detenido."); } });
+$("#tapaLeer").addEventListener("click", () => { if(tapaListo()){ tapaAviso("Leyendo del Arduino…"); enviarCtl("gin", "TAPA_V?"); } });
+$("#tapaGuardar").addEventListener("click", () => {
+  if(!tapaListo()) return; const us = tapaUsDePantalla(); if(us == null) return;
+  TAPA.guardando = true; tapaAviso("Guardando en el Arduino…"); enviarCtl("gin", `TAPA_V:${us}`);
+  clearTimeout(TAPA.t); TAPA.t = setTimeout(() => { if(TAPA.guardando){ TAPA.guardando = false; tapaAviso("✖ El Arduino no contestó. Sube el programa nuevo Arduino_Rueda_v17.ino a la rueda.", true); } }, 2500);
+});
 $("#actLeer").addEventListener("click", () => { if(actListo()){ actAviso("Leyendo del Arduino…"); enviarCtl("gin", "ACT_T?"); enviarCtl("gin", "ACT_RT?"); } });
 $$("[data-rt]").forEach(b => b.addEventListener("click", () => {
   const inp = $("#actRt"); inp.value = Math.max(0.5, Math.min(60, Math.round(((+inp.value || 0) + Number(b.dataset.rt)) * 10) / 10));

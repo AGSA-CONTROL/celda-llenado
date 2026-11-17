@@ -61,6 +61,7 @@
    Comandos: INICIAR PAUSA PARO RESET HOME PASO ESTADO? MODO:AUTO MODO:MANUAL
              OK_LLENADO OK_TAPADO OK_VERIF SPEED:<10-100> SET_ST<0-3>:<deg> GRADOS?
              JOG:±<deg> GOTO_ST:<0-3> GOTO_DEG:<idx>:<deg> FORZ:<tag>:<0|1> POS? TARA CAL:<g>
+             TAPA_V? / TAPA_V:<µs 1000-2000> (velocidad del servo de tapas, 1500 = parado; se guarda)
              ACT_EXT ACT_RET ACT_GIRO:<ms> ACT_STOP (actuador E3 de 360°)
              ? E2?  (sensor E2 del dispensador) · DISP_FIN[:tolva] (fin de dispensado: vibra T_VIB_EXTRA_MS y da el OK de Llenado)
              VIB:1 / VIB:0 (vibrador automático al dispensar) · VIB_MAN:1|0 (BOTÓN del HMI: solo lo apaga el botón)
@@ -193,7 +194,16 @@ long tCarga = -1, tLlenado = -1, tTapado = -1, tDesv = -1;
 /* ---- Estación 2 (Tapado): servo 360° + inductivo I2 ---- */
 Servo servoTapa;
 const unsigned long T_TAPADO_TIMEOUT_MS = 5000;   // si I2 no detecta la tapa en este tiempo, el servo se detiene
-const uint16_t SERVO_TAPA_GIRO_US = 1100;         // pulso de giro del servo continuo
+/* VELOCIDAD del servo de tapas (360°): pulso en µs. 1500 = parado; entre más lejos de 1500, más rápido.
+   Menos de 1500 gira para un lado y más de 1500 para el otro. Se calibra en el HMI y se guarda en la EEPROM. */
+uint16_t servoTapaUs = 1100;                       // de fábrica (como antes)
+const int      EE_TAPA_BASE  = 120;               // después del tiempo retraído (110)
+const uint16_t EE_TAPA_MAGIC = 0x7A91;
+struct CfgTapa { uint16_t magic; uint16_t us; };
+bool tapaUsValido(long us){ return us >= 1000 && us <= 2000 && (us <= 1460 || us >= 1540); }
+void cargarServoTapa(){ CfgTapa c; EEPROM.get(EE_TAPA_BASE, c); if(c.magic == EE_TAPA_MAGIC && tapaUsValido(c.us)) servoTapaUs = c.us; }
+void guardarServoTapa(){ CfgTapa c = { EE_TAPA_MAGIC, servoTapaUs }; EEPROM.put(EE_TAPA_BASE, c); }
+void enviarServoTapa(){ Serial.print(F("TAPA_V,")); Serial.println(servoTapaUs); }
 const uint8_t  TAPA_IND_DEBOUNCE_TICKS = 2;       // lecturas seguidas (20 ms c/u) para validar I2
 uint8_t  faseTapa    = 0;      // 0 espera · 1 servo girando hasta I2 · 2 sellando
 bool     tapaE2Hecha = false;  // el tapado de ESTA parada ya terminó
@@ -310,6 +320,7 @@ void setup(){
   limpiarVasos();
   cargarActuador();
   cargarRetraido();
+  cargarServoTapa();
   iniciarActuador();
 
   delay(200);                                   // igual que dispensador_e2.ino
@@ -504,7 +515,7 @@ void actualizarActuador() {
 /* Servo 360° de la Estación 2: se mueve con PWM (librería Servo), no con digitalWrite */
 void iniciarServoTapa(){
   if(!servoTapa.attached()) servoTapa.attach(PIN_SERVO_TAPA, 1000, 2000);
-  servoTapa.writeMicroseconds(SERVO_TAPA_GIRO_US);
+  servoTapa.writeMicroseconds(servoTapaUs);
   servoActivo = true;
   tapaIndLibre = false;            // exige ver I2 libre antes de aceptar la detección
   tapaPaso = false; tapaRapCont = 0;
@@ -1011,6 +1022,12 @@ void procesarLinea(char* l){
   }
   else if(!strcmp(l,"ACT_STOP")){ actGirar(0); actGiroManual = false; if(actEstado != ACT_SOSTENIDO) actEstado = ACT_REPOSO; Serial.println("ACT,paro"); }
   else if(!strcmp(l,"MOTOR?")){ Serial.print(F("MOTOR_DC,")); Serial.println(motorDcOn ? 1 : 0); }
+  else if(!strcmp(l,"TAPA_V?")) enviarServoTapa();
+  else if(!strncmp(l,"TAPA_V:",7)){                  // velocidad del servo de tapas (µs): se guarda en la EEPROM
+    long v = atol(l + 7);
+    if(tapaUsValido(v)){ servoTapaUs = (uint16_t)v; guardarServoTapa(); if(servoActivo && servoTapa.attached()) servoTapa.writeMicroseconds(servoTapaUs); enviarServoTapa(); }
+    else Serial.println(F("ERR,TAPA_V"));
+  }
   else if(!strcmp(l,"TAPA?")){ Serial.print("TAPA,pin="); Serial.print(digitalRead(PIN_TAPA_IND)); Serial.print(",detecta="); Serial.print(sensorTapaIndRaw() ? 1 : 0); Serial.print(",paso="); Serial.print(tapaPaso ? 1 : 0); Serial.print(",servo="); Serial.println(servoActivo ? 1 : 0); }
   else if(!strcmp(l,"AGV?")){ Serial.print("AGV,"); Serial.println(agvListo ? 1 : 0); }
   else if(!strcmp(l,"TARA"))       tarar();
