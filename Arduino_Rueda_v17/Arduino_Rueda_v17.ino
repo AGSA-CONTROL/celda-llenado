@@ -235,7 +235,10 @@ char    txBuf[128];
 uint8_t txLen = 0, txPos = 0;
 
 /* ---- Sensor E2 del dispensador (antes dispensador_e2.ino): mismo pin 8 que F1 ---- */
-const unsigned long E2_ANTIRREBOTE_MS = 50;   // la lectura debe mantenerse este tiempo para contar como cambio
+const unsigned long E2_ANTIRREBOTE_MS = 50;   // LLEGA un vaso: la lectura debe mantenerse este tiempo
+/* SE VA el vaso CON EL VIBRADOR PRENDIDO: tiene que dejar de verse este tiempo seguido. Con la vibración el sensor parpadea y,
+   con solo 50 ms, el dispensador creía que pusieron otro vaso y servía la siguiente porción en el MISMO vaso. */
+const unsigned long E2_SALIDA_MS = 500;
 bool e2Estado    = false;     // lo último que se reportó (true = hay recipiente)
 bool e2Candidato = false;     // lectura que se está confirmando
 unsigned long e2TCambio = 0;
@@ -1087,7 +1090,8 @@ void enviarEstado(){
 void vigilarE2(){
   bool lectura = sensorF1();
   if(lectura != e2Candidato){ e2Candidato = lectura; e2TCambio = millis(); }
-  if(e2Candidato != e2Estado && millis() - e2TCambio >= E2_ANTIRREBOTE_MS){
+  // con el vibrador prendido la rueda está quieta: un "ya no hay vaso" corto es parpadeo por la vibración
+  if(e2Candidato != e2Estado && millis() - e2TCambio >= ((!e2Candidato && motorDcOn) ? E2_SALIDA_MS : E2_ANTIRREBOTE_MS)){
     e2Estado = e2Candidato;
     e2Pendiente = true;
     if(!e2Estado){                                  // el vaso se fue: vibrador apagado y listo para el siguiente

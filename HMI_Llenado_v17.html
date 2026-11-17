@@ -1886,7 +1886,7 @@ class SimDispensador{
   sigPend(){ return this.pend.findIndex(x => x > 0); }
   empezarPorcion(){
     const a = this.activo;
-    this.estado = "GIRANDO"; this.giroN = 1; this.restante = this.T.giro; this.tIni = Date.now();
+    this.estado = "GIRANDO"; this.giroN = 1; this.restante = this.msPorcion(); this.tIni = Date.now();   // igual que el Arduino: tiempo calibrado
     this.emit(`PORCION,${a + 1},${this.total[a] - this.pend[a] + 1},${this.total[a]}`);
   }
   comenzar(){
@@ -1982,6 +1982,7 @@ class SimDispensador{
     }
   }
   rellenar(){ this.nivel = [1, 1, 1]; }
+  msPorcion(){ return (this.ag && this.ag.ms[this.activo]) || 1000; }   // "Tiempo abierto" calibrado de la tolva activa
   sensores(){
     const t = window.DISP ? DISP.calTolvas() : null;
     for(let i = 0; i < 3; i++){
@@ -1995,13 +1996,13 @@ class SimDispensador{
     switch(this.estado){
       case "GIRANDO":
         if(now - this.tIni >= this.restante){
-          this.nivel[this.activo] = Math.max(0, this.nivel[this.activo] - 0.025);
+          this.nivel[this.activo] = Math.max(0, this.nivel[this.activo] - 0.025 * this.msPorcion() / 1000);   // baja según el tiempo abierto
           this.tPausa = now;
-          if(this.giroN < 2) this.estado = "ESPERA_GIRO";
+          if(this.giroN < (this.ag.k[this.activo] || 1)) this.estado = "ESPERA_GIRO";               // "Veces" calibradas
           else { this.estado = "ENTRE"; this.emit(`CAYENDO,${this.T.caida}`); }
         } break;
       case "ESPERA_GIRO":
-        if(now - this.tPausa >= this.T.pausa){ this.giroN++; this.estado = "GIRANDO"; this.restante = this.T.giro; this.tIni = now; }
+        if(now - this.tPausa >= this.ag.pausa){ this.giroN++; this.estado = "GIRANDO"; this.restante = this.msPorcion(); this.tIni = now; }
         break;
       case "ENTRE":                               // servo parado: deja caer el producto
         if(now - this.tPausa >= this.T.caida){
