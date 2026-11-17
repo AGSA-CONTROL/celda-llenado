@@ -306,6 +306,7 @@ void setup(){
   stepUsActual = stepUsIndex;
   limpiarVasos();
   cargarActuador();
+  cargarRetraido();
   iniciarActuador();
 
   delay(200);                                   // igual que dispensador_e2.ino
@@ -355,8 +356,7 @@ bool sensorTapaInd(){ return tapaIndCont >= TAPA_IND_DEBOUNCE_TICKS; }
    ANTES DE PRENDER: deja el actuador a mano en RETRAÍDO (paso libre de los recipientes).
    AL PRENDER: el Arduino lo EXTIENDE solo. Extendido = los vasos se van a la MERMA (rechazo).
    VASO BUENO en Calidad (E3): se RETRAE para dejar libre el conducto y que el vaso caiga al carro AGV;
-     se queda retraído hasta que el sensor de E2 (pin 11) ve un recipiente nuevo tras T_CAIDA_MS
-     (o por T_ACT_MAX_MS) y entonces se vuelve a EXTENDER.
+     se queda retraído el TIEMPO RETRAÍDO (T_RETRAIDO_MS, se calibra en el HMI) y luego se vuelve a EXTENDER.
    Vaso rechazado: el actuador no se mueve (ya está extendido hacia la merma).
 
    CÓMO CALIBRARLO (HMI > Calibración > Actuador lineal, o la consola de la rueda):
@@ -366,6 +366,8 @@ bool sensorTapaInd(){ return tapaIndCont >= TAPA_IND_DEBOUNCE_TICKS; }
      ACT_STOP       lo detiene al instante
      ACT_T?                      lee los tiempos guardados -> ACT_T,ida,regreso,velocidad,sentido
      ACT_T:ida,regreso,vel,sent  los cambia y los GUARDA en la EEPROM (ya no hay que reprogramar)
+     ACT_RT? / ACT_RT:<ms>       tiempo que se queda RETRAÍDO para dejar pasar el recipiente (se guarda)
+     ACT_CICLO                   prueba: retrae, espera el tiempo retraído y vuelve a extender
    Todo esto se hace desde el HMI: pestaña Rueda > Actuador lineal.
    - Si no extiende completo: sube el tiempo de extender.   Si se pasa o forza: bájalo.
    - Si no retrae completo: sube el tiempo de retraer.
@@ -396,8 +398,15 @@ void enviarActuador(){
   Serial.print(F("ACT_T,")); Serial.print(T_ACT_IDA_MS); Serial.print(','); Serial.print(T_ACT_REGRESO_MS);
   Serial.print(','); Serial.print(ACT_VELOCIDAD_US); Serial.print(','); Serial.println((int)ACT_SENTIDO);
 }
-const unsigned long T_CAIDA_MS    = 10000;   // tiempo mínimo extendido para que caiga el vaso (ajustable)
-const unsigned long T_ACT_MAX_MS  = 15000;   // respaldo: regresa aunque E2 nunca cambie
+/* TIEMPO RETRAÍDO: cuánto se queda retraído (paso libre) para que pase el recipiente al carro.
+   Se calibra en el HMI (Calibración > Actuador lineal) y se guarda en la EEPROM. */
+unsigned long T_RETRAIDO_MS = 10000;         // de fábrica 10 s · rango 0.5 a 60 s
+const int      EE_RT_BASE  = 110;            // después del vibrador (100)
+const uint16_t EE_RT_MAGIC = 0xA7E1;
+struct CfgRt { uint16_t magic; uint32_t ms; };
+void cargarRetraido(){ CfgRt c; EEPROM.get(EE_RT_BASE, c); if(c.magic == EE_RT_MAGIC && c.ms >= 500 && c.ms <= 60000) T_RETRAIDO_MS = c.ms; }
+void guardarRetraido(){ CfgRt c = { EE_RT_MAGIC, (uint32_t)T_RETRAIDO_MS }; EEPROM.put(EE_RT_BASE, c); }
+void enviarRetraido(){ Serial.print(F("ACT_RT,")); Serial.println(T_RETRAIDO_MS); }
 /* Para detenerlo se manda write(90), igual que en el código de prueba que sí funcionó. */
 
 Servo srvAct;
@@ -409,6 +418,7 @@ ActEstado actEstado = ACT_REPOSO;
 unsigned long actT0 = 0;
 bool actF2Libre = false;                    // E2 ya quedó libre desde que se activó
 unsigned long actTActivo = 0;               // momento en que se activó
+unsigned long actTRet = 0;                  // momento en que quedó RETRAÍDO (cuenta T_RETRAIDO_MS)
 unsigned long actGiroFin = 0;               // giro manual (ACT_EXT / ACT_RET / ACT_GIRO): hasta cuándo
 bool actGiroManual = false;
 unsigned long actRegresoMs = 1100;          // cuánto debe volver a extender (menos si un paro cortó la retracción a la mitad)
@@ -434,7 +444,7 @@ bool actuadorOcupado() { return actEstado != ACT_REPOSO; }
 // Llamar cuando E3 aprueba el vaso: se RETRAE para que el vaso caiga al carro
 bool actPendiente = false;                  // llegó un vaso bueno mientras se extendía: al terminar se retrae
 void dispararActuador() {
-  if (actEstado == ACT_SOSTENIDO) { actTActivo = millis(); actF2Libre = false; return; }   // ya está retraído: sigue así
+  if (actEstado == ACT_SOSTENIDO) { actTActivo = millis(); actTRet = actTActivo; actF2Libre = false; return; }   // ya está retraído: vuelve a contar el tiempo
   if (actEstado == ACT_REGRESANDO || actEstado == ACT_INICIO) { actPendiente = true; return; }
   if (actEstado != ACT_REPOSO) return;
   actGiroManual = false;
@@ -470,14 +480,11 @@ void actualizarActuador() {
       if (ahora - actT0 >= T_ACT_IDA_MS) { actGirar(0); actEstado = ACT_REPOSO; if (actPendiente) { actPendiente = false; dispararActuador(); } }
       break;
     case ACT_HACIA_ACTIVO:                   // retrayendo
-      if (ahora - actT0 >= T_ACT_REGRESO_MS) { actGirar(0); actEstado = ACT_SOSTENIDO; }   // retraído: se para
+      if (ahora - actT0 >= T_ACT_REGRESO_MS) { actGirar(0); actEstado = ACT_SOSTENIDO; actTRet = ahora; }   // retraído: se para y cuenta el tiempo
       break;
     case ACT_SOSTENIDO: {
-      // espera a que E2 (pin 11) quede libre y luego detecte un recipiente nuevo; respaldo por tiempo
-      if (!sensorF2()) actF2Libre = true;
-      bool liberarPorF2     = actF2Libre && sensorF2() && ahora - actTActivo >= T_CAIDA_MS;
-      bool liberarPorTiempo = ahora - actTActivo >= T_ACT_MAX_MS;
-      if (liberarPorF2 || liberarPorTiempo) {
+      // se queda retraído el TIEMPO RETRAÍDO calibrado (deja pasar el recipiente) y luego se extiende
+      if (ahora - actTRet >= T_RETRAIDO_MS) {
         actGirar(1);                         // vuelve a extender (merma)
         actT0 = ahora;
         actEstado = ACT_REGRESANDO;
@@ -840,7 +847,7 @@ void cmdParo(){
   actGirar(0); actGiroManual = false;            // el actuador se detiene donde esté
   if(actEstado == ACT_HACIA_ACTIVO){                              // quedó a medio camino: regresará solo lo que avanzó
     actRegresoMs = (unsigned long)((millis() - actT0) * (float)T_ACT_IDA_MS / T_ACT_REGRESO_MS);
-    actEstado = ACT_SOSTENIDO;
+    actEstado = ACT_SOSTENIDO; actTRet = millis();
   }
   else if(actEstado == ACT_REGRESANDO || actEstado == ACT_INICIO) actEstado = ACT_REPOSO;
 }
@@ -981,6 +988,16 @@ void procesarLinea(char* l){
   else if(!strcmp(l,"ACT_EXT")){ actGiroPrueba((long)T_ACT_IDA_MS); Serial.println("ACT,extender"); }
   else if(!strncmp(l,"ACT_GIRO:",9)){ actGiroPrueba(atol(l + 9)); Serial.println("ACT,giro"); }
   else if(!strcmp(l,"ACT_T?")) enviarActuador();
+  else if(!strcmp(l,"ACT_RT?")) enviarRetraido();
+  else if(!strncmp(l,"ACT_RT:",7)){                 // tiempo retraído en ms: se guarda en la EEPROM
+    long v = atol(l + 7);
+    if(v >= 500 && v <= 60000){ T_RETRAIDO_MS = (unsigned long)v; guardarRetraido(); enviarRetraido(); }
+    else Serial.println(F("ERR,ACT_RT"));
+  }
+  else if(!strcmp(l,"ACT_CICLO")){                  // prueba: retrae, espera el tiempo retraído y extiende
+    if(actEstado == ACT_REPOSO){ dispararActuador(); Serial.println(F("ACT,ciclo")); }
+    else Serial.println(F("ERR,ACT_CICLO"));
+  }
   else if(!strncmp(l,"ACT_T:",6)){
     long ida = 0, reg = 0, vel = 0, sen = 0;
     if(sscanf(l + 6, "%ld,%ld,%ld,%ld", &ida, &reg, &vel, &sen) == 4 && ida >= 50 && ida <= 20000 && reg >= 50 && reg <= 20000
