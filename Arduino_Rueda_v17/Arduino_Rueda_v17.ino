@@ -62,6 +62,7 @@
              OK_LLENADO OK_TAPADO OK_VERIF SPEED:<10-100> SET_ST<0-3>:<deg> GRADOS?
              JOG:±<deg> GOTO_ST:<0-3> GOTO_DEG:<idx>:<deg> FORZ:<tag>:<0|1> POS? TARA CAL:<g>
              TAPA_V? / TAPA_V:<µs 1000-2000> (velocidad del servo de tapas, 1500 = parado; se guarda)
+             TAPA_PRUEBA (gira hasta que I2 ve la tapa o 5 s; también en automático) · TAPA_PRUEBA:0 (detener)
              ACT_EXT ACT_RET ACT_GIRO:<ms> ACT_STOP (actuador E3 de 360°)
              ? E2?  (sensor E2 del dispensador) · DISP_FIN[:tolva] (fin de dispensado: vibra T_VIB_EXTRA_MS y da el OK de Llenado)
              VIB:1 / VIB:0 (vibrador automático al dispensar) · VIB_MAN:1|0 (BOTÓN del HMI: solo lo apaga el botón)
@@ -534,9 +535,13 @@ void detenerServoTapa(){
   digitalWrite(PIN_SERVO_TAPA, LOW);
   servoActivo = false;
 }
-void vigilarServoForzado(){          // prueba manual FORZ:SV1:1 (se detiene con I2 o por tiempo)
+void vigilarServoForzado(){          // prueba manual FORZ:SV1:1 / TAPA_PRUEBA (se detiene con I2 o por tiempo)
   if(forzServoFin == 0) return;
-  if(!servoActivo || tapaPaso || (long)(millis() - forzServoFin) >= 0){ detenerServoTapa(); forzServoFin = 0; }
+  if(!servoActivo || tapaPaso || (long)(millis() - forzServoFin) >= 0){
+    bool porTapa = tapaPaso;
+    detenerServoTapa(); forzServoFin = 0;
+    Serial.println(porTapa ? F("TAPA_PRUEBA,0,tapa") : F("TAPA_PRUEBA,0,tiempo"));   // el HMI dice por qué se paró
+  }
 }
 
 float leerCelda(){ return pesoActual; }
@@ -688,6 +693,7 @@ void tareasEstaciones(long dt){
       if(vaso[2].presente) vaso[2].tapa = true;
       tapaE2Hecha = true; faseTapa = 0; tTapado = -1; tapaForzada = false; reportarEvento(0x20);
     } else if(faseTapa == 0){                          // llegada: arranca el servo
+      forzServoFin = 0;                                // si había una prueba del HMI, el tapado real manda
       faseTapa = 1; tTapado = (long)T_TAPADO_TIMEOUT_MS;
       if(vaso[2].presente) vaso[2].dispensada = true;   // el dispensador SÍ giró para este vaso
       iniciarServoTapa();
@@ -1023,6 +1029,12 @@ void procesarLinea(char* l){
   else if(!strcmp(l,"ACT_STOP")){ actGirar(0); actGiroManual = false; if(actEstado != ACT_SOSTENIDO) actEstado = ACT_REPOSO; Serial.println("ACT,paro"); }
   else if(!strcmp(l,"MOTOR?")){ Serial.print(F("MOTOR_DC,")); Serial.println(motorDcOn ? 1 : 0); }
   else if(!strcmp(l,"TAPA_V?")) enviarServoTapa();
+  else if(!strcmp(l,"TAPA_PRUEBA")){                 // botón "Probar giro" del HMI: funciona también en automático
+    if(estado == ST_ESTOP) Serial.println(F("ERR,TAPA_PRUEBA,paro"));
+    else if(faseTapa != 0) Serial.println(F("ERR,TAPA_PRUEBA,tapando"));   // está poniendo una tapa: no se interrumpe
+    else { iniciarServoTapa(); forzServoFin = millis() + T_TAPADO_TIMEOUT_MS; Serial.println(F("TAPA_PRUEBA,1")); }
+  }
+  else if(!strcmp(l,"TAPA_PRUEBA:0")){ if(forzServoFin){ detenerServoTapa(); forzServoFin = 0; } Serial.println(F("TAPA_PRUEBA,0,boton")); }
   else if(!strncmp(l,"TAPA_V:",7)){                  // velocidad del servo de tapas (µs): se guarda en la EEPROM
     long v = atol(l + 7);
     if(tapaUsValido(v)){ servoTapaUs = (uint16_t)v; guardarServoTapa(); if(servoActivo && servoTapa.attached()) servoTapa.writeMicroseconds(servoTapaUs); enviarServoTapa(); }

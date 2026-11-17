@@ -1844,6 +1844,12 @@ class SimGinebra{
       case "ACT_T?": this.emit(this.actLinea()); break;
       case "ACT_RT?": this.emit(this.rtLinea()); break;
       case "TAPA_V?": this.emit(this.tapaLinea()); break;
+      case "TAPA_PRUEBA":
+        if(arg === "0"){ clearTimeout(this.tTapaPrueba); this.forz.SV1 = 0; this.emit("TAPA_PRUEBA,0,boton"); }
+        else if(d.estado === 4) this.emit("ERR,TAPA_PRUEBA,paro");
+        else { this.forz.SV1 = 1; this.emit("TAPA_PRUEBA,1"); clearTimeout(this.tTapaPrueba);
+               this.tTapaPrueba = setTimeout(() => { this.forz.SV1 = 0; this.emit("TAPA_PRUEBA,0,tapa"); }, Math.round(1500 * 400 / Math.max(40, Math.abs((this.tapaUs || 1100) - 1500)))); }
+        break;
       case "TAPA_V": { const v = Number(arg); if(v >= 1000 && v <= 2000 && (v <= 1460 || v >= 1540)){ this.tapaUs = v; try{ localStorage.setItem("hmi01_simTapaUs", String(v)); }catch(_){} this.emit(this.tapaLinea()); } else this.emit("ERR,TAPA_V"); } break;
       case "ACT_RT": { const v = Number(arg); if(v >= 500 && v <= 60000){ this.rt = v; try{ localStorage.setItem("hmi01_simRt", String(v)); }catch(_){} this.emit(this.rtLinea()); } else this.emit("ERR,ACT_RT"); } break;
       case "ACT_CICLO": this.emit("ACT,ciclo"); break;
@@ -2079,6 +2085,7 @@ function alLinea(k, linea){
   if(k === "gin" && linea.startsWith("ACT_T,")){ onActT(linea); return; }
   if(k === "gin" && linea.startsWith("ACT_RT,")){ onActRt(linea); return; }
   if(k === "gin" && linea.startsWith("TAPA_V,")){ onTapaV(linea); return; }
+  if(k === "gin" && (linea.startsWith("TAPA_PRUEBA,") || linea.startsWith("ERR,TAPA_PRUEBA"))){ onTapaPrueba(linea); return; }
   if(k === "gin" && linea === "ERR,TAPA_V"){ TAPA.guardando = false; tapaAviso("✖ El Arduino no aceptó esa velocidad.", true); return; }
   if(k === "gin" && linea === "ACT,ciclo"){ actVisual("ok"); return; }        // prueba del paso del vaso: también se ve en el dibujo
   if(k === "gin" && (linea === "ERR,ACT_RT" || linea === "ERR,ACT_CICLO")){ ACT.guardandoRt = false; actAviso(linea === "ERR,ACT_RT" ? "✖ El Arduino no aceptó el tiempo retraído (0.5 a 60 s)." : "✖ El actuador está ocupado: espera a que termine y vuelve a probar.", true); return; }
@@ -3183,7 +3190,7 @@ $("#actProbarIda").addEventListener("click", () => { const x = actValores(); if(
 $("#actProbarReg").addEventListener("click", () => { const x = actValores(); if(x) actProbar(-x.reg); });
 $("#actStop").addEventListener("click", () => { if(actListo()){ enviarCtl("gin", "ACT_STOP"); actAviso("Actuador detenido."); } });
 /* ===== Servo de tapas: velocidad (TAPA_V:<µs>, 1500 = parado; ±500 µs = 100 %) ===== */
-const TAPA = { us:1100, guardando:false, t:null };
+const TAPA = { us:1100, guardando:false, t:null, probando:false, tp:null };
 const tapaAviso = (t, mal) => { const e = $("#tapaInfo"); e.textContent = t; e.style.color = mal ? "var(--red)" : ""; };
 function tapaUsDePantalla(){
   const pct = Math.round(+$("#tapaVel").value);
@@ -3208,10 +3215,19 @@ $$("[data-tv]").forEach(b => b.addEventListener("click", () => {
 $("#tapaProbar").addEventListener("click", () => {
   if(!tapaListo()) return; const us = tapaUsDePantalla(); if(us == null) return;
   if(us !== TAPA.us) enviarCtl("gin", `TAPA_V:${us}`);       // prueba con la velocidad de la pantalla (y la guarda)
-  enviarCtl("gin", "FORZ:SV1:1");
-  tapaAviso(`Girando al ${$("#tapaVel").value} %… se para cuando el sensor I2 ve la tapa (o a los 5 s). ¿Quedó bien la tapa?`);
+  TAPA.probando = true; tapaAviso(`Pidiendo que gire al ${$("#tapaVel").value} %…`);
+  enviarCtl("gin", "TAPA_PRUEBA");
+  clearTimeout(TAPA.tp); TAPA.tp = setTimeout(() => { if(TAPA.probando){ TAPA.probando = false; tapaAviso("✖ La rueda no contestó. Sube el programa nuevo Arduino_Rueda_v17.ino a la rueda.", true); } }, 1500);
 });
-$("#tapaStop").addEventListener("click", () => { if(tapaListo()){ enviarCtl("gin", "FORZ:SV1:0"); tapaAviso("Servo de tapas detenido."); } });
+$("#tapaStop").addEventListener("click", () => { if(tapaListo()){ enviarCtl("gin", "TAPA_PRUEBA:0"); } });
+function onTapaPrueba(l){
+  const p = l.split(","); TAPA.probando = false; clearTimeout(TAPA.tp);
+  if(p[0] === "ERR") return tapaAviso(p[2] === "paro" ? "✖ No gira: el paro de emergencia está activo." : "✖ Ahorita la rueda está poniendo una tapa: espera a que termine y vuelve a probar.", true);
+  if(p[1] === "1") return tapaAviso(`▶ Girando al ${Math.round(Math.abs(TAPA.us - 1500) / 5)} %… se para cuando el sensor I2 ve la tapa (o a los 5 s).`);
+  tapaAviso(p[2] === "tapa" ? "■ Se paró: el sensor I2 vio la tapa. ¿Quedó bien? Si se pasó, bájale la velocidad." :
+            p[2] === "tiempo" ? "■ Se paró a los 5 s: el sensor I2 no vio ninguna tapa. Si no hay tapas o el sensor no la ve, es normal." :
+            "■ Servo de tapas detenido.");
+}
 $("#tapaLeer").addEventListener("click", () => { if(tapaListo()){ tapaAviso("Leyendo del Arduino…"); enviarCtl("gin", "TAPA_V?"); } });
 $("#tapaGuardar").addEventListener("click", () => {
   if(!tapaListo()) return; const us = tapaUsDePantalla(); if(us == null) return;
