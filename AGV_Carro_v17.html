@@ -131,9 +131,10 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .destBtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .destBtns button.homeBtn{grid-column:1/-1;padding:10px 4px;border-color:var(--blue,#4ea1ff);color:var(--text)}
 .destBtns button.homeBtn small{display:inline;margin:0 0 0 8px}
+.notaCtl.bien{color:var(--green)}
 .destBtns button.homeBtn.on{border-color:var(--blue,#4ea1ff);background:rgba(78,161,255,.16);color:var(--blue,#4ea1ff)}
 .destBtns button.homeBtn:disabled{opacity:.45;cursor:not-allowed}
-.destBtns.pide button{animation:pide 1s ease-in-out infinite}
+.destBtns.pide button[data-d]{animation:pide 1s ease-in-out infinite}
 @keyframes pide{50%{border-color:var(--yellow);box-shadow:0 0 14px rgba(245,166,35,.55)}}
 .destBtns button{padding:14px 4px;border-radius:10px;border:2px solid var(--border2);background:var(--inset);font-weight:800;font-size:15px;cursor:pointer;line-height:1.15}
 .destBtns button small{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:3px}
@@ -307,7 +308,7 @@ pre.proto{max-height:none}
           <button type="button" data-d="1">Almacén 1<small>QR-E1</small></button>
           <button type="button" data-d="2">Almacén 2<small>QR-E2</small></button>
           <button type="button" data-d="3">Almacén 3<small>QR-E3</small></button>
-          <button type="button" id="btnHomeCarro" class="homeBtn" title="Regresar el carro a la posición de carga">⌂ Regresar a HOME<small>QR-HOME</small></button>
+          <button type="button" id="btnHomeCarro" class="homeBtn" title="Regresar el carro a la posición de carga">⌂ Regresar a HOME<small id="homeSub">QR-HOME</small></button>
         </div>
         <select id="modoDest" hidden><option value="0">Sin elegir</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
         <div class="paso"><span class="pnum">2</span>Mueve el carro</div>
@@ -663,22 +664,26 @@ function paro(on){
   render(); publicar(true);
 }
 /* ⌂ HOME: el carro regresa a la posición de carga (QR-HOME) siguiendo la línea, sin descargar */
+const avisoCtl = { txt:"", hasta:0, mal:false };
+function avisarCtl(txt, mal){ avisoCtl.txt = txt; avisoCtl.mal = !!mal; avisoCtl.hasta = Date.now() + 5000; toast(txt); render(); }
 function irHome(){
   if(!MODO_SIM){
     const e = ESP.tel && ESP.tel.estado;
-    if(e === "DESCARGANDO"){ toast("Está descargando: al terminar regresa solo a HOME."); return; }
+    if(e === "DESCARGANDO"){ avisarCtl("Está descargando: al terminar regresa solo a HOME.", true); return; }
+    if(e === "CARGA" || e === "ESPERA_DESTINO"){ avisarCtl("✔ El carro ya está en HOME (posición de carga)."); return; }
     const nv = ESP.tel ? (Array.isArray(ESP.tel.vasos) ? ESP.tel.vasos.length : Number(ESP.tel.vasos) || 0) : 0;
     if(nv > 0 && !confirm("El carro trae vasos que no ha entregado. ¿Regresarlo a HOME de todos modos?")) return;
-    ctl("home"); log("⌂ Orden enviada: regresar a la posición de carga (HOME)."); return;
+    ctl("home"); log("⌂ Orden enviada: regresar a la posición de carga (HOME)."); avisarCtl("⌂ Orden enviada: el carro regresa a HOME."); return;
   }
-  if(st.estado === "CARGA" || st.estado === "ESPERA_DESTINO"){ toast("El carro ya está en la posición de carga (HOME)."); return; }
-  if(st.estado === "DESCARGANDO"){ toast("Está descargando: al terminar regresa solo a HOME."); return; }
+  if(st.estado === "CARGA" || st.estado === "ESPERA_DESTINO"){ avisarCtl("✔ El carro ya está en HOME (posición de carga)."); return; }
+  if(st.estado === "DESCARGANDO"){ avisarCtl("Está descargando: al terminar regresa solo a HOME.", true); return; }
   if(st.vasos.length && !confirm("El carro trae vasos que no ha entregado. ¿Regresarlo a HOME de todos modos?")) return;
   st.pausado = false;
   if(st.estado === "EN_ESTACION") st.prev = "REGRESANDO";           // estaba leyendo un QR: sigue hacia HOME
   else { st.prev = "REGRESANDO"; st.estado = "REGRESANDO"; }
   log("⌂ Regresando a la posición de carga (HOME) por la línea.");
-  render(); publicar(true);
+  avisarCtl("⌂ El carro regresa a HOME por la línea.");
+  publicar(true);
 }
 /* pasos del viaje que cambian el estado y avisan al HMI */
 function leerQr(n){ if(st.lote) st.lote.destino = n; log(`🔳 QR leído: Almacén ${n}.`); st.estado = "A_ALMACEN"; evento("qr"); }
@@ -960,7 +965,12 @@ function render(){
   }
   $("#cPiso").textContent = st.piso;
   const valDest = MODO_SIM ? cfg.modo : (ESP.tel ? String(ESP.tel.modoDest || 0) : $("#modoDest").value);
-  $$("#destBtns button").forEach(b => b.classList.toggle("on", b.dataset.d === valDest));
+  $$("#destBtns button[data-d]").forEach(b => b.classList.toggle("on", b.dataset.d === valDest));
+  /* ⌂ HOME: se ve seleccionado cuando el carro está en HOME o va hacia HOME */
+  const enHome = st.estado === "CARGA" || st.estado === "ESPERA_DESTINO";
+  const aHome = st.estado === "REGRESANDO" || (st.estado === "EN_ESTACION" && st.prev === "REGRESANDO");
+  $("#btnHomeCarro").classList.toggle("on", enHome || aHome);
+  $("#homeSub").textContent = enHome ? "✔ el carro está aquí" : aHome ? (st.pausado ? "en PARO" : "regresando…") : "QR-HOME";
   let porque = "";
   if(!MODO_SIM && !SRV.abierto) porque = "No se puede: esta página no está conectada al servidor (abre la pestaña Comunicación).";
   else if(MODO_SIM && SRV.espera) porque = "Esta página está en espera: hay otra página del carro en modo Simulador abierta. Usa esa o ciérrala.";
@@ -971,10 +981,12 @@ function render(){
   else if(!proximoDestino()) porque = "Primero elige a qué almacén va (1, 2 o 3). Sin almacén el carro no avanza.";
   $("#btnEnviar").disabled = !!porque;
   $("#destBtns").classList.toggle("pide", !proximoDestino() && (st.estado === "CARGA" || st.estado === "ESPERA_DESTINO"));
-  const nc = $("#notaCtl"); nc.classList.toggle("mal", !!porque);
+  const nc = $("#notaCtl");
+  if(Date.now() < avisoCtl.hasta){ nc.classList.remove("mal"); nc.classList.toggle("bien", !avisoCtl.mal); nc.classList.toggle("mal", !!avisoCtl.mal); nc.textContent = avisoCtl.txt; }
+  else { nc.classList.remove("bien"); nc.classList.toggle("mal", !!porque);
   nc.textContent = porque || (MODO_SIM
     ? "Modo simulador: AVANZAR saca el carro virtual. PARO lo detiene donde esté."
-    : "Listo: AVANZAR saca el carro hacia el almacén elegido. PARO lo detiene donde esté.");
+    : "Listo: AVANZAR saca el carro hacia el almacén elegido. PARO lo detiene donde esté."); }
   [$("#btnParo"), $("#btnParo2")].forEach(bp => { bp.textContent = st.pausado ? "▶ CONTINUAR" : "⛔ PARO"; bp.classList.toggle("cont", st.pausado); });
   $("#lugar").innerHTML = ultQr === null ? (st.estado === "CARGA" ? "QR-HOME<small>Estación de carga</small>" : "—<small>Todavía no lee ningún QR</small>")
     : ultQr === 0 ? "QR-HOME<small>Estación de carga</small>" : `QR-E${ultQr}<small>Almacén ${ultQr}</small>`;
