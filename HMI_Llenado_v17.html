@@ -235,11 +235,11 @@ details summary:hover{color:var(--text)}
 #svgAct #actVaso{transition:transform 1.5s cubic-bezier(.45,0,.25,1),opacity .6s ease}
 #svgAct #actTapa{transition:opacity .4s ease}
 #svgAct .bin{transition:filter .4s ease}
-/* v17: en reposo el actuador está EXTENDIDO (tapa el paso al carro: los vasos van a la merma);
-   con un vaso aprobado se RETRAE, el vaso pasa al carro y luego vuelve a extenderse */
-#svgAct #actRod{transform:translateX(52px)}
+/* v17: siempre inicia RETRAÍDO (paso libre al carro). Vaso CON tapa = se retrae y se queda;
+   vaso SIN tapa = se extiende (paso a la merma) y se queda así hasta que llegue otro con tapa */
+#svgAct #actRod{transform:translateX(0)}
+#svgAct.act-ext #actRod{transform:translateX(52px)}
 #svgAct #actVaso{transform:translateX(-70px)}
-#svgAct.act-ok #actRod{transform:translateX(0)}
 #svgAct.act-ok.act-drop #actVaso{transform:translateX(70px);opacity:0;transition:transform 1.2s ease-in,opacity .9s ease .5s}
 #svgAct.act-ok #actHead{filter:url(#fGlowOk)}
 #svgAct.act-ok #binOk{filter:url(#fGlowOk)}
@@ -1081,9 +1081,9 @@ window.ALM_PEDIDO = {};
                   <text x="164" y="232" text-anchor="middle" font-size="10" font-weight="700" style="fill:var(--red)">MERMA</text>
                 </g>
               </svg>
-              <div class="status" id="actEstado">EXTENDIDO · paso a la merma</div>
+              <div class="status" id="actEstado">RETRAÍDO · paso libre al carro</div>
               <p class="hint hintMin" style="margin:10px 0 0">En reposo el actuador está extendido (los vasos van a la merma). Aprobado: se retrae, el vaso pasa al carro y se vuelve a extender. Rechazado: sigue extendido y el vaso va a la merma.</p>
-              <div class="row" style="margin-top:12px"><button class="btn sm" id="btnActOk" type="button">Probar aprobado</button><button class="btn sm red" id="btnActRech" type="button">Probar rechazado</button></div>
+              <div class="row" style="margin-top:12px"><button class="btn sm" id="btnActOk" type="button">Probar vaso con tapa</button><button class="btn sm red" id="btnActRech" type="button">Probar vaso sin tapa</button></div>
             </section>
           </div>
         </div>
@@ -1338,8 +1338,8 @@ window.ALM_PEDIDO = {};
             <div id="moveDegList"></div>
           </section>
           <section class="grp wide" id="actPanel">
-            <h3>Actuador lineal (servo de 360°) · se mueve por tiempo</h3>
-            <div class="viewHeader" style="padding:0 0 10px">El servo de 360° no tiene HOME: se mueve por <b>tiempo</b>. <b>Antes de prender</b>, déjalo a mano <b>retraído</b> (paso de los recipientes). <b>Al prender</b>, el Arduino lo <b>extiende</b> (los vasos van a la <b>merma</b>). Cuando Calidad <b>aprueba</b> un vaso, se <b>retrae</b>, se queda retraído el <b>tiempo retraído</b> para que pase el recipiente al carro y luego se vuelve a extender. Prueba con los botones hasta que extienda y retraiga completo, y pulsa <b>"Guardar en el Arduino"</b>.</div>
+            <h3>Actuador lineal (servo de 360°) · se mueve con el sensor de tapa</h3>
+            <div class="viewHeader" style="padding:0 0 10px">El servo de 360° no tiene HOME. <b>Antes de prender</b>, déjalo a mano <b>retraído</b>: al prender <b>no se mueve</b>. En Verificación: si el vaso trae <b>tapa</b> y está extendido, se <b>retrae</b> y se queda retraído (si ya estaba retraído, no hace nada). Si el vaso viene <b>sin tapa</b> y está retraído, se <b>extiende</b> (a la merma) y se queda así hasta que llegue otro vaso con tapa. Ya no usa tiempo de espera. Calibra con los botones hasta que extienda y retraiga completo, y pulsa <b>"Guardar en el Arduino"</b>.</div>
             <div class="actGrid">
               <div class="actFila"><span>Tiempo para EXTENDER <small class="actSub">(a la merma · write 0)</small></span>
                 <button class="btn sm" type="button" data-act="ida:-100">−</button><input type="number" id="actIda" min="50" max="20000" step="10" value="1100"><em>ms</em><button class="btn sm" type="button" data-act="ida:100">+</button>
@@ -1347,9 +1347,10 @@ window.ALM_PEDIDO = {};
               <div class="actFila"><span>Tiempo para RETRAER <small class="actSub">(paso al carro · write 180)</small></span>
                 <button class="btn sm" type="button" data-act="reg:-100">−</button><input type="number" id="actReg" min="50" max="20000" step="10" value="1136"><em>ms</em><button class="btn sm" type="button" data-act="reg:100">+</button>
                 <button class="btn sm green" type="button" id="actProbarReg">◀ Probar retraer</button></div>
-              <div class="actFila"><span>Tiempo RETRAÍDO <small class="actSub">(deja pasar el recipiente al carro · se cuenta desde que Llenado termina de dispensar)</small></span>
-                <button class="btn sm" type="button" data-rt="-0.5">−</button><input type="number" id="actRt" min="0.5" max="60" step="0.5" value="10"><em>s</em><button class="btn sm" type="button" data-rt="0.5">+</button>
-                <button class="btn sm green" type="button" id="actProbarCiclo">▶ Probar paso del vaso</button></div>
+              <div class="actFila"><span>Posición <small class="actSub">(el Arduino recuerda si está retraído o extendido)</small></span>
+                <div style="grid-column:2/-1;display:flex;flex-wrap:wrap;gap:8px"><button class="btn sm green" type="button" id="actPosRet">✔ Ya lo puse retraído a mano</button>
+                <button class="btn sm" type="button" id="actHacerExt">▶ Extender</button>
+                <button class="btn sm" type="button" id="actHacerRet">◀ Retraer</button></div></div>
               <div class="actFila"><span>Velocidad</span>
                 <input type="range" id="actVel" min="10" max="90" step="5" value="90" style="grid-column:2/5"><em id="actVelTxt">90</em>
                 <label class="actSent"><input type="checkbox" id="actSent"> Invertir sentido</label></div>
@@ -1586,10 +1587,6 @@ class SimGinebra{
   tapaLinea(){
     if(this.tapaUs == null){ try{ const v = Number(localStorage.getItem("hmi01_simTapaUs")); this.tapaUs = v >= 1000 && v <= 2000 ? v : 1100; }catch(_){ this.tapaUs = 1100; } }
     return `TAPA_V,${this.tapaUs}`;
-  }
-  rtLinea(){
-    if(this.rt == null){ try{ const v = Number(localStorage.getItem("hmi01_simRt")); this.rt = v >= 500 && v <= 60000 ? v : 10000; }catch(_){ this.rt = 10000; } }
-    return `ACT_RT,${this.rt}`;
   }
   vibLinea(){
     if(this.vibAlto == null){ try{ const v = localStorage.getItem("hmi01_simVibAlto"); this.vibAlto = v === "0" ? 0 : 1; }catch(_){ this.vibAlto = 1; } }
@@ -1844,7 +1841,6 @@ class SimGinebra{
         }
       } break;
       case "ACT_T?": this.emit(this.actLinea()); break;
-      case "ACT_RT?": this.emit(this.rtLinea()); break;
       case "TAPA_V?": this.emit(this.tapaLinea()); break;
       case "TAPA_PRUEBA":
         if(arg === "0"){ clearTimeout(this.tTapaPrueba); this.forz.SV1 = 0; this.emit("TAPA_PRUEBA,0,boton"); }
@@ -1853,8 +1849,6 @@ class SimGinebra{
                this.tTapaPrueba = setTimeout(() => { this.forz.SV1 = 0; this.emit("TAPA_PRUEBA,0,tapa"); }, Math.round(1500 * 400 / Math.max(40, Math.abs((this.tapaUs || 1100) - 1500)))); }
         break;
       case "TAPA_V": { const v = Number(arg); if(v >= 1000 && v <= 2000 && (v <= 1460 || v >= 1540)){ this.tapaUs = v; try{ localStorage.setItem("hmi01_simTapaUs", String(v)); }catch(_){} this.emit(this.tapaLinea()); } else this.emit("ERR,TAPA_V"); } break;
-      case "ACT_RT": { const v = Number(arg); if(v >= 500 && v <= 60000){ this.rt = v; try{ localStorage.setItem("hmi01_simRt", String(v)); }catch(_){} this.emit(this.rtLinea()); } else this.emit("ERR,ACT_RT"); } break;
-      case "ACT_CICLO": this.emit("ACT,ciclo"); break;
       case "ACT_T": {
         const v = arg.split(",").map(Number);
         if(v.length === 4 && v[0] >= 50 && v[0] <= 20000 && v[1] >= 50 && v[1] <= 20000 && v[2] >= 10 && v[2] <= 90 && (v[3] === 1 || v[3] === -1)){
@@ -1862,8 +1856,10 @@ class SimGinebra{
           this.emit(this.actLinea());
         } else this.emit("ERR,ACT_T");
       } break;
-      case "ACT_EXT": this.emit("ACT,extender"); break;
-      case "ACT_RET": this.emit("ACT,regresar"); break;
+      case "ACT_EXT": this.emit(ACT_POS === "ret" ? "ACT,extender" : "ACT,ya_extendido"); break;   // el simulador usa la posición del dibujo
+      case "ACT_RET": this.emit(ACT_POS === "ext" ? "ACT,regresar" : "ACT,ya_retraido"); break;
+      case "ACT_POS_RET": this.emit("ACT,pos_retraido"); break;
+      case "ACT?": this.emit(`ACT,${ACT_POS === "ext" ? 0 : 2},0`); break;
       case "ACT_GIRO": this.emit("ACT,giro"); break;
       case "ACT_STOP": this.emit("ACT,paro"); break;
       case "SIM_AUTOOK": this.simAutoOk = arg === "1"; break;
@@ -2085,12 +2081,10 @@ function alLinea(k, linea){
   logCtl(k, "RX", linea);
   if(k === "gin" && linea.startsWith("GRADOS,")){ onGrados(linea); return; }
   if(k === "gin" && linea.startsWith("ACT_T,")){ onActT(linea); return; }
-  if(k === "gin" && linea.startsWith("ACT_RT,")){ onActRt(linea); return; }
   if(k === "gin" && linea.startsWith("TAPA_V,")){ onTapaV(linea); return; }
   if(k === "gin" && (linea.startsWith("TAPA_PRUEBA,") || linea.startsWith("ERR,TAPA_PRUEBA"))){ onTapaPrueba(linea); return; }
   if(k === "gin" && linea === "ERR,TAPA_V"){ TAPA.guardando = false; tapaAviso("✖ El Arduino no aceptó esa velocidad.", true); return; }
-  if(k === "gin" && linea === "ACT,ciclo"){ actVisual("ok"); return; }        // prueba del paso del vaso: también se ve en el dibujo
-  if(k === "gin" && (linea === "ERR,ACT_RT" || linea === "ERR,ACT_CICLO")){ ACT.guardandoRt = false; actAviso(linea === "ERR,ACT_RT" ? "✖ El Arduino no aceptó el tiempo retraído (0.5 a 60 s)." : "✖ El actuador está ocupado: espera a que termine y vuelve a probar.", true); return; }
+  if(k === "gin" && /^ACT,[a-z_0-9]/.test(linea) && onActResp(linea)) return;
   if(k === "gin" && linea.startsWith("VIB,")){ if(window.VIBR) VIBR.deLinea(linea); return; }
   if(k === "gin" && linea === "BOOT"){ if(window.VIBR) VIBR.reinicio(); return; }   // el Arduino de la rueda se reinició
   if(k === "gin" && linea === "ERR,ACT_T"){ ACT.guardando = false; actAviso("✖ El Arduino no aceptó los tiempos (el actuador debe estar en reposo).", true); return; }
@@ -2233,7 +2227,7 @@ async function conectar(k, modo){
     }
     enviarCtl(k, "GRADOS?");
     enviarCtl(k, "ACT_T?");                      // tiempos del actuador lineal guardados
-    enviarCtl(k, "ACT_RT?");                     // tiempo que se queda retraído
+    enviarCtl(k, "ACT?");                        // ¿está retraído o extendido? (para el dibujo)
     enviarCtl(k, "TAPA_V?");                     // velocidad del servo de tapas
     enviarCtl(k, "E2?");                         // firmware unido: pide el estado del sensor E2 (pin 8)
   }
@@ -2876,11 +2870,22 @@ function arrancarAutomatico(){
 }
 function renderModoGin(){ /* el botón AUTOMÁTICO no cambia de aspecto */ }
 /* ---------- Actuador lineal E3 (visual): aprobado = el vástago empuja el vaso a BUENOS; rechazado = no sale y cae a RECHAZO ---------- */
-const ACT_VIS = {ext:1500, hold:1200, ret:1500, rechDrop:700, rechHold:2600};   // tiempos visuales en ms
+const ACT_VIS = {mover:1500, drop:900, limpiar:2600};   // tiempos visuales en ms (solo el dibujo)
 let actTimers = [];
+let ACT_POS = "ret";                                     // siempre inicia RETRAÍDO (igual que el Arduino)
+function actTexto(){
+  const txt = $("#actEstado"); if(!txt) return;
+  txt.textContent = ACT_POS === "ret" ? "RETRAÍDO · paso libre al carro" : "EXTENDIDO · paso a la merma";
+  txt.className = "status";
+}
 function actLimpiar(){
   actTimers.forEach(clearTimeout); actTimers = [];
   const svg = $("#svgAct"); if(svg) svg.classList.remove("act-ok", "act-rej", "act-drop");
+}
+/* pone el vástago donde está (retraído / extendido) y se queda ahí */
+function actPosicion(pos){
+  ACT_POS = pos === "ext" ? "ext" : "ret";
+  const svg = $("#svgAct"); if(svg) svg.classList.toggle("act-ext", ACT_POS === "ext");
 }
 function actVisual(tipo){
   const svg = $("#svgAct"), txt = $("#actEstado");
@@ -2888,26 +2893,18 @@ function actVisual(tipo){
   actLimpiar();
   void svg.getBoundingClientRect();                       // reinicia las transiciones si llega otro evento seguido
   const T = (fn, ms) => actTimers.push(setTimeout(fn, ms));
-  const reposo = () => { txt.textContent = "EXTENDIDO · paso a la merma"; txt.className = "status"; };
-  if(tipo === "ok"){
-    svg.classList.add("act-ok");
-    txt.textContent = "APROBADO · el actuador se retrae y el vaso pasa al carro"; txt.className = "status run";
-    T(() => svg.classList.add("act-drop"), ACT_VIS.ext);                       // retraído: el vaso pasa al carro
-    /* igual que el Arduino: el tiempo retraído se empieza a contar cuando Llenado termina de dispensar */
-    const llenando = () => !!(window.DISP && DISP.estado && DISP.estado().dispensando);
-    const esperar = () => {
-      if(llenando()){ txt.textContent = "RETRAÍDO · espera a que Llenado termine de dispensar"; return T(esperar, 200); }
-      txt.textContent = `RETRAÍDO · ${(ACT_VIS.hold / 1000).toFixed(1)} s para que pase el recipiente`;
-      T(() => svg.classList.remove("act-ok"), ACT_VIS.hold);                   // se vuelve a extender
-      T(() => { svg.classList.remove("act-drop"); reposo(); }, ACT_VIS.hold + ACT_VIS.ret);
-    };
-    T(esperar, ACT_VIS.ext);
-  } else {
-    svg.classList.add("act-rej");                                              // sigue extendido
-    txt.textContent = "RECHAZADO · sigue extendido, el vaso va a la merma"; txt.className = "status stop";
-    T(() => svg.classList.add("act-drop"), ACT_VIS.rechDrop);                  // el vaso cae a RECHAZO
-    T(() => { svg.classList.remove("act-rej", "act-drop"); reposo(); }, ACT_VIS.rechHold);
+  if(tipo === "ok"){                                      // vaso CON tapa
+    const mueve = ACT_POS === "ext";
+    actPosicion("ret"); svg.classList.add("act-ok");
+    txt.textContent = mueve ? "CON TAPA · se retrae y se queda retraído" : "CON TAPA · ya estaba retraído, no se mueve"; txt.className = "status run";
+    T(() => svg.classList.add("act-drop"), mueve ? ACT_VIS.mover : 300);       // el vaso pasa al carro
+  } else {                                                // vaso SIN tapa
+    const mueve = ACT_POS === "ret";
+    actPosicion("ext"); svg.classList.add("act-rej");
+    txt.textContent = mueve ? "SIN TAPA · se extiende y se queda extendido" : "SIN TAPA · ya estaba extendido, no se mueve"; txt.className = "status stop";
+    T(() => svg.classList.add("act-drop"), mueve ? ACT_VIS.mover : 300);       // el vaso cae a la merma
   }
+  T(() => { svg.classList.remove("act-ok", "act-rej", "act-drop"); actTexto(); }, ACT_VIS.limpiar);
 }
 
 function renderGin(){
@@ -3154,7 +3151,7 @@ $("#moveDegList").addEventListener("click", e => {
   enviarCtl("gin", `GOTO_DEG:${i}:${v}`); toast(`Moviendo a ${v}° y guardado como ${NOMBRES_EST_CAL[i]}`);
 });
 /* ---------- actuador lineal (servo 360°, por tiempo) ---------- */
-const ACT = { ida:1100, reg:1136, vel:90, sent:1, rt:10000, leido:false };
+const ACT = { ida:1100, reg:1136, vel:90, sent:1, leido:false };
 function actAviso(t, mal){ const e = $("#actInfo"); e.textContent = t; e.style.color = mal ? "var(--red)" : ""; }
 function actListo(){
   if(!CTL.gin.conectado){ actAviso("✖ La rueda no está conectada (pestaña Comunicación).", true); return false; }
@@ -3167,23 +3164,12 @@ function actValores(){
 }
 function actPintar(){
   $("#actIda").value = ACT.ida; $("#actReg").value = ACT.reg; $("#actVel").value = ACT.vel; $("#actVelTxt").textContent = ACT.vel; $("#actSent").checked = ACT.sent === -1;
-  $("#actRt").value = +(ACT.rt / 1000).toFixed(1);
-  actAviso(`Guardado en el Arduino: extender ${ACT.ida} ms · retraer ${ACT.reg} ms · retraído ${(ACT.rt / 1000).toFixed(1)} s · velocidad ${ACT.vel}${ACT.vel === 90 ? " (máxima)" : ""}${ACT.sent === -1 ? " · sentido invertido" : ""}.`);
-}
-function onActRt(l){
-  const v = Number(l.split(",")[1]); if(!(v >= 500 && v <= 60000)) return;
-  ACT.rt = v; ACT_VIS.hold = v;                         // el dibujo también se queda retraído ese tiempo
-  actPintar(); if(ACT.guardandoRt){ ACT.guardandoRt = false; if(!ACT.guardando) actAviso("✔ " + $("#actInfo").textContent); }
-}
-function actRtValor(){
-  const s = Number($("#actRt").value);
-  if(!(s >= 0.5 && s <= 60)){ actAviso("✖ El tiempo retraído debe estar entre 0.5 y 60 s.", true); return null; }
-  return Math.round(s * 1000);
+  actAviso(`Guardado en el Arduino: extender ${ACT.ida} ms · retraer ${ACT.reg} ms · velocidad ${ACT.vel}${ACT.vel === 90 ? " (máxima)" : ""}${ACT.sent === -1 ? " · sentido invertido" : ""}.`);
 }
 function onActT(l){
   const p = l.split(",").map(Number);
   ACT.ida = p[1]; ACT.reg = p[2]; ACT.vel = p[3]; ACT.sent = p[4]; ACT.leido = true;
-  actPintar(); if(ACT.guardando){ ACT.guardando = false; if(!ACT.guardandoRt) actAviso("✔ " + $("#actInfo").textContent); }
+  actPintar(); if(ACT.guardando){ ACT.guardando = false; actAviso("✔ " + $("#actInfo").textContent); }
 }
 /* para probar se manda primero la velocidad y el sentido que están en pantalla (sin cambiar los tiempos guardados) */
 function actProbar(ms){
@@ -3245,21 +3231,30 @@ $("#tapaGuardar").addEventListener("click", () => {
   TAPA.guardando = true; tapaAviso("Guardando en el Arduino…"); enviarCtl("gin", `TAPA_V:${us}`);
   clearTimeout(TAPA.t); TAPA.t = setTimeout(() => { if(TAPA.guardando){ TAPA.guardando = false; tapaAviso("✖ El Arduino no contestó. Sube el programa nuevo Arduino_Rueda_v17.ino a la rueda.", true); } }, 2500);
 });
-$("#actLeer").addEventListener("click", () => { if(actListo()){ actAviso("Leyendo del Arduino…"); enviarCtl("gin", "ACT_T?"); enviarCtl("gin", "ACT_RT?"); } });
-$$("[data-rt]").forEach(b => b.addEventListener("click", () => {
-  const inp = $("#actRt"); inp.value = Math.max(0.5, Math.min(60, Math.round(((+inp.value || 0) + Number(b.dataset.rt)) * 10) / 10));
-}));
-$("#actProbarCiclo").addEventListener("click", () => {
-  if(!actListo()) return; const ms = actRtValor(); if(ms == null) return;
-  if(ms !== ACT.rt){ ACT.guardandoRt = false; enviarCtl("gin", `ACT_RT:${ms}`); }   // la prueba usa el tiempo de la pantalla (y lo guarda)
-  enviarCtl("gin", "ACT_CICLO");
-  actAviso(`Probando: se retrae, se queda retraído ${(ms / 1000).toFixed(1)} s y se vuelve a extender. ¿Alcanzó a pasar el recipiente? Si no, sube el tiempo.`);
-});
+$("#actLeer").addEventListener("click", () => { if(actListo()){ actAviso("Leyendo del Arduino…"); enviarCtl("gin", "ACT_T?"); enviarCtl("gin", "ACT?"); } });
+/* respuestas del Arduino sobre la posición del actuador */
+function onActResp(l){
+  const p = l.split(",");
+  if(/^\d+$/.test(p[1])){                                 // ACT,<estado>,<s3>  (0 = extendido, 2 = retraído)
+    const e = +p[1]; if(e === 0 || e === 2){ actLimpiar(); actPosicion(e === 0 ? "ext" : "ret"); actTexto(); } return true;
+  }
+  switch(p[1]){
+    case "regresar":     actLimpiar(); actPosicion("ret"); actTexto(); actAviso("◀ Retrayendo… se queda retraído."); return true;
+    case "extender":     actLimpiar(); actPosicion("ext"); actTexto(); actAviso("▶ Extendiendo… se queda extendido."); return true;
+    case "pos_retraido": actLimpiar(); actPosicion("ret"); actTexto(); actAviso("✔ Listo: el Arduino sabe que está RETRAÍDO."); return true;
+    case "ya_retraido":  actPosicion("ret"); actTexto(); actAviso("Ya estaba retraído: no se movió."); return true;
+    case "ya_extendido": actPosicion("ext"); actTexto(); actAviso("Ya estaba extendido: no se movió."); return true;
+    case "ocupado":      actAviso("✖ El actuador se está moviendo: espera a que termine.", true); return true;
+  }
+  return false;
+}
+$("#actPosRet").addEventListener("click", () => { if(actListo()) enviarCtl("gin", "ACT_POS_RET"); });
+$("#actHacerExt").addEventListener("click", () => { if(actListo()) enviarCtl("gin", "ACT_EXT"); });
+$("#actHacerRet").addEventListener("click", () => { if(actListo()) enviarCtl("gin", "ACT_RET"); });
 $("#actGuardar").addEventListener("click", () => {
   if(!actListo()) return; const x = actValores(); if(!x) return;
-  const rt = actRtValor(); if(rt == null) return;
-  actAviso("Guardando en el Arduino…"); ACT.guardando = true; ACT.guardandoRt = true;
-  enviarCtl("gin", `ACT_T:${x.ida},${x.reg},${x.vel},${x.sent}`); enviarCtl("gin", `ACT_RT:${rt}`);
+  actAviso("Guardando en el Arduino…"); ACT.guardando = true;
+  enviarCtl("gin", `ACT_T:${x.ida},${x.reg},${x.vel},${x.sent}`);
   clearTimeout(ACT.tResp); ACT.tResp = setTimeout(() => { if(ACT.guardando){ ACT.guardando = false; actAviso("✖ El Arduino no contestó. Sube el programa nuevo Arduino_Rueda_v17.ino a la rueda.", true); } }, 2500);
 });
 $("#rawGin").addEventListener("keydown", e => {
