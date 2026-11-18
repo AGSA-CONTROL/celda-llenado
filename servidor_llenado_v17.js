@@ -305,6 +305,28 @@ function eliminarSala(n) {
   return true;
 }
 
+/* ---------- vasos QUITADOS del carro ESP32 ----------
+   Si el ESP32 tiene un programa que no sabe vaciarse, el servidor deja de mostrar esos vasos
+   (al HMI, a la página del carro y a la tienda). Si caen vasos nuevos, solo se ven los nuevos. */
+function vasosVisibles(S, m) {
+  const v = Array.isArray(m.vasos) ? m.vasos : [];
+  S.ultVasosEsp = v.length; S.ultEstadoEsp = m;
+  if (!S.vasosQuitados) return m;
+  if (m.estado && m.estado !== "CARGA" && m.estado !== "ESPERA_DESTINO") { S.vasosQuitados = 0; return m; }   // ya salió
+  if (v.length < S.vasosQuitados) S.vasosQuitados = v.length;            // el ESP32 sí se vació (programa nuevo)
+  return S.vasosQuitados ? Object.assign({}, m, { vasos: v.slice(S.vasosQuitados) }) : m;
+}
+function quitarVasosEsp(S) {
+  if (!S.agvEsp) return;
+  S.vasosQuitados = S.ultVasosEsp || 0;
+  if (S.ultEstadoEsp) {                                   // se ve vacío al instante en el HMI y en la página
+    const m = vasosVisibles(S, S.ultEstadoEsp);
+    if (S.agv === S.agvEsp) enviar(S.hmi, m);
+    avisarVistas(S, m);
+  }
+  console.log("[" + S.nombre + "] Vasos del carro ESP32 quitados: " + S.vasosQuitados);
+}
+
 function cerrarPedido(S, id) { setTimeout(() => S.pedidos.delete(id), 10 * 60 * 1000); }
 
 wss.on("connection", (ws, req) => {
@@ -428,18 +450,21 @@ wss.on("connection", (ws, req) => {
     } else if (ws.rol === "agv") {
       if (!AGV_A_HMI.includes(m.tipo)) return;
       if (ws !== S.agvEsp && !S.agvPaginas.includes(ws)) return;   // carro real sin permiso: no habla
+      if (ws === S.agvEsp && m.tipo === "agv_estado") m = vasosVisibles(S, m);   // vasos quitados: no se muestran
       if (ws === S.agv) enviar(S.hmi, m);                    // al HMI solo le habla el carro activo
       if (ws === S.agvEsp && S.vistas.size) avisarVistas(S, m); // la página en modo "Carro real" siempre ve al ESP32
       if (ws === S.agvEsp && puente && puente.readyState === 1) puente.send(JSON.stringify(m));   // y se lo pasa a la nube
     } else if (ws.rol === "agv_vista") {
       if (m.tipo === "agv_ctl" && CTL_VISTA.includes(m.cmd)) {
         if (!S.agvEsp) return enviar(ws, { tipo: "error", msg: "No hay carro ESP32 en la sala \"" + S.nombre + "\"." });
+        if (m.cmd === "vaciar") quitarVasosEsp(S);               // 🗑 Quitar vasos: funciona aunque el ESP32 tenga el programa viejo
         enviar(S.agvEsp, { tipo: "agv_ctl", cmd: m.cmd, on: !!m.on, v: Number(m.v) || 0 });
       }
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "disponibilidad") {     // a TODAS las tiendas de la sala
       S.ultimaDisp = { tipo: "disponibilidad", pedir: !!m.pedir, agv: String(m.agv || "").slice(0, 20), msg: String(m.msg || "").slice(0, 160) };
       S.tiendas.forEach(t => enviar(t, S.ultimaDisp));
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "agv_cmd") {
+      if (m.cmd === "cancelar" && S.agv && S.agv === S.agvEsp) quitarVasosEsp(S);   // lote cancelado / reset
       enviar(S.agv, m);
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "estado") {
       const r = S.pedidos.get(m.id);
