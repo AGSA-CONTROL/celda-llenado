@@ -3521,6 +3521,20 @@ const AGV = (() => {
   }
 
   setInterval(() => avisarDisponibilidad(), 1000);   // si el dispensador se conecta o entra en paro, la tienda se entera
+  /* LOS VASOS DEL CARRO VAN A LA PAR DEL LOTE: si el carro está en HOME con vasos pero ya no hay lote
+     (se canceló, se reseteó, se reinició algo), el HMI lo vacía solo. */
+  let tSobran = 0;
+  setInterval(() => {
+    const ocupado = window.DISP && DISP.carroOcupado ? DISP.carroOcupado() : true;
+    const sobran = st.usar && st.online && st.estado === "CARGA" && (st.vasos || []).length > 0 && !ocupado;
+    if(!sobran){ tSobran = 0; return; }
+    if(!tSobran){ tSobran = Date.now(); return; }
+    if(Date.now() - tSobran >= 3000){
+      tSobran = 0;
+      servidor({ tipo:"agv_cmd", cmd:"cancelar" });
+      log("🧹 El carro tenía vasos sin ningún lote en curso: se vació para ir a la par con la rueda y la tienda.");
+    }
+  }, 1000);
   /* ---------- API para el resto del HMI ---------- */
   const api = {
     avisar: (f) => avisarDisponibilidad(f),
@@ -4821,6 +4835,8 @@ return {
   tienda: (id, f, x) => tiendaEstado(id, f, x),
   loteActivo: () => LV.activo,
   /* lote de prueba hecho desde el HMI (sin tienda): entra a la cola como cualquier lote */
+  /* ¿el carro debe tener vasos? solo si hay un lote en curso o uno terminado esperando salir */
+  carroOcupado: () => !!(LV.activo || LV.salida),
   /* paro de emergencia general (botón de arriba): también para / rearma el dispensador */
   emergencia: (on) => tx(on ? "E" : "R"),
   pedidoPrueba: (p) => {
