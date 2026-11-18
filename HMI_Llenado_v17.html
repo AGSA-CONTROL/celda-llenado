@@ -2528,11 +2528,13 @@ function paroEmergencia(){
   if(H.estop){
     H.estop = false;
     enviarCtl("gin", "RESET");
-    if(window.AGV) AGV.paro(false);
-    toast("Sistema rearmado");
+    if(window.DISP && DISP.emergencia) DISP.emergencia(false);   // rearma también el dispensador
+    if(window.AGV){ AGV.paro(false); AGV.cancelar(); }          // el carro queda vacío y listo en HOME
+    toast("Sistema rearmado · pulsa ▶ AUTOMÁTICO para seguir");
   }else{
     H.estop = true;
     enviarCtl("gin", "PARO");
+    if(window.DISP && DISP.emergencia) DISP.emergencia(true);    // para también el dispensador: el lote se cancela en todo
     if(window.AGV) AGV.paro(true);
     toast("Paro de emergencia activado");
   }
@@ -4796,6 +4798,7 @@ procesar = function (msg) {
     if (window.AGV) AGV.cancelar();
   }
   if ((msg === "EMERGENCIA" || msg === "CANCELADO") && typeof CTL !== "undefined" && CTL.gin.conectado) enviarCtl("gin", "VIB:0");
+  if (msg === "RESET_OK" && window.AGV) AGV.cancelar();   // Reset del dispensador: el carro queda vacío y listo
   procesarLote(msg);
   if (msg.startsWith("ERR,")) { devolverRepo(env); render(); }
 };
@@ -4818,6 +4821,8 @@ return {
   tienda: (id, f, x) => tiendaEstado(id, f, x),
   loteActivo: () => LV.activo,
   /* lote de prueba hecho desde el HMI (sin tienda): entra a la cola como cualquier lote */
+  /* paro de emergencia general (botón de arriba): también para / rearma el dispensador */
+  emergencia: (on) => tx(on ? "E" : "R"),
   pedidoPrueba: (p) => {
     if (LV.activo || st.armado || st.enviando || cola.length) return "ocupado";
     if (!(link && st.listo && !st.emergencia)) return "no_listo";

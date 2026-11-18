@@ -77,6 +77,7 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .tablero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .tablero .fEstado,.tablero .fVasos{grid-column:1/-1}
 .fVasos .vasos{min-height:44px}
+.btnVaciar{margin-left:auto;font:inherit;font-size:11px;letter-spacing:.5px;font-weight:800;padding:4px 10px;border-radius:8px;border:1px solid var(--red);background:rgba(229,72,77,.12);color:var(--text);cursor:pointer;text-transform:none}
 .dest svg{display:none!important}
 .lado{display:flex;flex-direction:column;gap:12px;min-width:0}
 .ficha{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -298,7 +299,8 @@ pre.proto{max-height:none}
           <div><b id="destTxt">—</b><small id="destSub"></small></div></div></div>
       <div class="ficha"><span class="flbl">Último QR leído</span>
         <div class="lugar" id="lugar">—</div></div>
-      <div class="ficha fVasos"><span class="flbl">Vasos en el carro</span>
+      <div class="ficha fVasos"><span class="flbl" style="display:flex;align-items:center;gap:8px">Vasos en el carro
+          <button type="button" id="btnVaciar" class="btnVaciar" hidden>🗑 Quitar vasos</button></span>
         <div class="vasos" id="vasos"><span></span><span></span><span></span></div></div>
     </div>
       <section class="grp ctl">
@@ -925,12 +927,21 @@ function deHmi(m){
   }
 }
 /* el HMI canceló el lote (paro de emergencia o "Cancelar"): se tira ese lote y el carro queda listo en HOME */
-function cancelarLote(){
+/* botón 🗑 Quitar vasos: vacía el carro a mano (solo en HOME) */
+function vaciarCarro(){
+  if(!confirm("¿Quitar los vasos del carro? Se olvida el lote que traía.")) return;
+  if(!MODO_SIM){ ctl("vaciar"); log("🗑 Orden enviada: quitar los vasos del carro."); return; }
+  cancelarLote(true);
+}
+function cancelarLote(aMano){
   if(st.estado !== "CARGA" && st.estado !== "ESPERA_DESTINO"){ log("🛑 El HMI canceló un lote, pero el carro ya va en camino: sigue su viaje."); return; }
   const n = st.vasos.length;
   st.vasos = []; st.lote = null; st.estado = "CARGA";
-  log(`🛑 El HMI canceló el lote.${n ? " Quita los " + n + " vaso(s) que quedaron en el carro." : ""}`);
-  avisarCtl(`🛑 Lote cancelado desde el HMI.${n ? " Quita los vasos del carro." : ""}`, true);
+  if(aMano){ log("🗑 Se quitaron los vasos del carro."); avisarCtl("🗑 Carro vacío: listo para el siguiente lote."); }
+  else {
+    log(`🛑 El HMI canceló el lote.${n ? " Quita los " + n + " vaso(s) que quedaron en el carro." : ""}`);
+    if(n) avisarCtl("🛑 Lote cancelado desde el HMI. Quita los vasos del carro.", true);
+  }
   publicar(true);
 }
 let ultPub = 0, ultFuerte = 0;
@@ -980,6 +991,7 @@ function render(){
   const enHome = st.estado === "CARGA" || st.estado === "ESPERA_DESTINO";
   const aHome = st.estado === "REGRESANDO" || (st.estado === "EN_ESTACION" && st.prev === "REGRESANDO");
   $("#btnHomeCarro").classList.toggle("on", enHome || aHome);
+  $("#btnVaciar").hidden = !(enHome && st.vasos.length > 0);
   $("#homeSub").textContent = enHome ? "✔ el carro está aquí" : aHome ? (st.pausado ? "en PARO" : "regresando…") : "QR-HOME";
   let porque = "";
   if(!MODO_SIM && !SRV.abierto) porque = "No se puede: esta página no está conectada al servidor (abre la pestaña Comunicación).";
@@ -1065,6 +1077,7 @@ function render(){
     if(!SRV.hmi || confirm("¿Enviar el carro ahora? Si la rueda está armando un lote, los vasos que falten caerán al piso.")) salir({ id:null, p:null });
   });
   $("#btnHomeCarro").addEventListener("click", irHome);
+  $("#btnVaciar").addEventListener("click", vaciarCarro);
   $("#btnParo").addEventListener("click", () => paro(!st.pausado));
   $("#btnParo2").addEventListener("click", () => paro(!st.pausado));
   $("#srvDir").value = location.protocol.startsWith("http") ? location.host : cfg.srv;

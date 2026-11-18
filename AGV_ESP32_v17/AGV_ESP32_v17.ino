@@ -1609,6 +1609,15 @@ void carroAlLlegar(int idx) {
   iniciarSecuenciaRampa();
 }
 
+// ---------- vaciar el carro: se tira el lote que traía (cancelado o botón 🗑) ----------
+void carroVaciar() {
+  if (carroEstado != CARRO_CARGA) { Serial.println(F("Carro: va en camino; no se vacía.")); return; }
+  carroVasosN = 0; carroEsperaDest = false; carroModoDest = 0;
+  carroLoteIdJson = "null"; carroDestino = 0;
+  Serial.println(F("Carro: vacío y listo en HOME (quita los vasos que tenga)."));
+  enviarTelemetria();
+}
+
 // ---------- ⌂ HOME: regresar a la posición de carga (botón de la página del carro) ----------
 bool carroHome() {
   if (carroEstado == CARRO_CARGA) { Serial.println(F("Carro: ya está en la posición de carga (HOME).")); return false; }
@@ -1777,6 +1786,7 @@ void procesarServidor(uint8_t* payload, size_t length) {
     else if (strcmp(c, "vel") == 0)      carroVelPct = constrain((int)(doc["v"] | 60), 20, 100);
     else if (strcmp(c, "modoSim") == 0)  cambiarModoSim(doc["on"] | false);
     else if (strcmp(c, "home") == 0)     carroHome();
+    else if (strcmp(c, "vaciar") == 0)   carroVaciar();      // botón 🗑 Quitar vasos de la página
     enviarTelemetria();
   } else if (strcmp(tipo, "agv_cmd") == 0) {
     const char* cmd = doc["cmd"] | "";
@@ -1794,13 +1804,8 @@ void procesarServidor(uint8_t* payload, size_t length) {
       carroVaso(doc["g"] | 0);
     } else if (strcmp(cmd, "paro") == 0) {
       carroParo(doc["on"] | false);
-    } else if (strcmp(cmd, "cancelar") == 0) {           // el HMI canceló el lote (paro / cancelar)
-      if (carroEstado == CARRO_CARGA) {
-        carroVasosN = 0; carroEsperaDest = false; carroModoDest = 0;
-        carroLoteIdJson = "null"; carroDestino = 0;
-        Serial.println(F("Carro: el HMI canceló el lote. Quita los vasos del carro."));
-        enviarTelemetria();
-      } else Serial.println(F("Carro: el HMI canceló un lote, pero el carro ya va en camino."));
+    } else if (strcmp(cmd, "cancelar") == 0) {           // el HMI canceló el lote (paro / cancelar / reset)
+      carroVaciar();
     }
   }
 }
