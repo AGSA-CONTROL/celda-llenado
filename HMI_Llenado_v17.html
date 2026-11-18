@@ -1437,8 +1437,8 @@ const GIN_ESTADOS = ["INACTIVO","PROCESANDO","INDEXANDO","EN PAUSA","PARO DE EME
 const CFG_DEF = () => ({
   pesoObjetivo:50, tolerancia:2, tIndex:1.4, reponer:true,
   silos:[
-    {nombre:"Arroz",  color:"#f2d16b", capacidad:1000, nivel:1000, flujo:25},
-    {nombre:"Frijol", color:"#c0703a", capacidad:1000, nivel:1000, flujo:25},
+    {nombre:"Frijol", color:"#8a4060", capacidad:1000, nivel:1000, flujo:25},
+    {nombre:"Arroz",  color:"#e3dccb", capacidad:1000, nivel:1000, flujo:25},
     {nombre:"Maíz",   color:"#f5a623", capacidad:1000, nivel:1000, flujo:25}
   ],
   estaciones:["Estación 1","Estación 2","Estación 3","Estación 4"]
@@ -1447,6 +1447,8 @@ let CFG = CFG_DEF();
 try{
   const g = JSON.parse(localStorage.getItem("hmi01_cfg") || "null");
   if(g && g.silos && g.silos.length === 3) CFG = Object.assign(CFG_DEF(), g);
+  /* tolvas fijas: 1 = Frijol, 2 = Arroz (antes Lentejas), 3 = Maíz — nombre y color siempre los de fábrica */
+  CFG_DEF().silos.forEach((d, i) => { if(CFG.silos[i]){ CFG.silos[i].nombre = d.nombre; CFG.silos[i].color = d.color; } });
 }catch(_){}
 function guardarCfg(){ try{ localStorage.setItem("hmi01_cfg", JSON.stringify(CFG)); }catch(_){} }
 
@@ -2725,7 +2727,7 @@ function construirTT(){
 }
 
 /* Los silos del dibujo son las 3 tolvas del DISPENSADOR (mismo orden, nombre y nivel que su pestaña). */
-const GRANO_COLOR = ["#8a4060", "#d08a44", "#f2c12e"];          // tolva 1, 2 y 3 (Frijol, Lentejas, Maíz)
+const GRANO_COLOR = ["#8a4060", "#e3dccb", "#f2c12e"];          // tolva 1, 2 y 3 (Frijol, Arroz, Maíz)
 function siloInfo(i){
   const conDisp = window.DISP && CTL.disp.conectado;
   const nombre = conDisp ? (DISP.granos()[i] || CFG.silos[i].nombre) : CFG.silos[i].nombre;
@@ -3293,7 +3295,7 @@ $("#leUser").focus();
    ====================================================================== */
 const AGV = (() => {
   const KEY = "hmi01_agvuso_" + (MODO_SIM ? "sim" : "fis");
-  const COLOR = ["#8a4060", "#d08a44", "#f2c12e"];
+  const COLOR = ["#8a4060", "#e3dccb", "#f2c12e"];
   const RUTA = "M 280 330 L 280 400 Q 280 470 350 470 L 780 470 Q 850 470 850 400 L 850 180 Q 850 110 780 110 L 350 110 Q 280 110 280 180 Z";
   const TXT = {
     CARGA:["EN POSICIÓN DE CARGA", "Esperando el lote de la rueda"],
@@ -3584,7 +3586,7 @@ window.AGV = AGV;
   /* ===== prueba de rechazo (Control de calidad, pestaña Rueda) =====
      Los botones son los VASOS DEL LOTE: si el pedido es 3 de Frijol salen Frijol, Frijol, Frijol.
      Lote = el que está corriendo; si no hay, el siguiente de la fila; si tampoco, el lote de prueba. */
-  const nomGrano = i => (window.DISP ? DISP.granos()[i - 1] : null) || ["Frijol", "Lentejas", "Maíz"][i - 1];
+  const nomGrano = i => (window.DISP ? DISP.granos()[i - 1] : null) || ["Frijol", "Arroz", "Maíz"][i - 1];
   const LOTE_PRUEBA = [1, 1, 1];
   const RQ = { marcas:[], hechos:[], pasados:{}, loteObj:null, firma:"", sinTapa:0, totAntes:null, espera:false };
   const secLote = p => { const q = []; (p || []).forEach((n, i) => { for(let k = 0; k < n; k++) q.push(i + 1); }); return q; };
@@ -3697,7 +3699,7 @@ const N = 3;
 const LOTE = 3;                                   // el pedido son lotes de 3 unidades
 const BAUDIOS = 115200, NIVEL_BAJO = 15, HC_MIN_CM = 3.0, ERR_SIN_ECO = 3, TIMEOUT_MS = 2000,
       MUESTRAS_CAL = 10;
-const GRANOS0 = ["Frijol", "Lentejas", "Maíz"];
+const GRANOS0 = ["Frijol", "Arroz", "Maíz"];
 const COLORES = [["#c0735a", "#7a3b2a"], ["#dba35a", "#a8672a"], ["#f7d44a", "#cf9a10"]];
 const ESTADOS = {                       // color, texto, parpadea
   NC:         ["#3a424d", "NO CONECTADO", false],
@@ -3726,7 +3728,7 @@ function cargarCal() {
         if (Number.isFinite(+c.vacia) && Number.isFinite(+c.llena)) cal.tolvas[i] = { vacia: +c.vacia, llena: +c.llena, vOk: !!c.vOk, lOk: !!c.lOk };
       });
       (d.granos || []).slice(0, N).forEach((n, i) => {
-        if (typeof n === "string" && n.trim()) cal.granos[i] = n.trim().slice(0, 16);
+        if (typeof n === "string" && n.trim()) cal.granos[i] = /^lentejas?$/i.test(n.trim()) ? "Arroz" : n.trim().slice(0, 16);   // la tolva 2 ahora es Arroz
       });
     }
   } catch (e) { /* sin almacenamiento: se usan los valores de fábrica */ }
@@ -3769,7 +3771,7 @@ const TIPOS = [                                 // [patrón, clase, icono]: gana
   [/[Ll]ote|[Pp]edido|PEDIDO/, "lote", "📦"],
   [/recipiente|Sensor E2/, "sensor", "🔘"],
 ];
-const ICONOS = ["🫘", "🌱", "🌽"];               // icono de cada tolva (frijol, lentejas, maíz)
+const ICONOS = ["🫘", "🍚", "🌽"];               // icono de cada tolva (frijol, arroz, maíz)
 const escaparRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Escribe el texto y resalta los nombres de grano con el color de su tolva.
@@ -4646,7 +4648,7 @@ iniciar();
 /* =====================================================================
    LOTE COMPLETO CON VERIFICACIÓN (reposición de rechazados)
    - Un lote solo termina cuando la estación de Verificación aprueba 3 vasos
-     con lo pedido (p. ej. Frijol + Lentejas + Maíz).
+     con lo pedido (p. ej. Frijol + Arroz + Maíz).
    - Si Verificación rechaza un vaso (VERIF,<tolva>,0 desde la rueda), se manda
      al dispensador un lote de reposición solo con ese grano (S,1,0,0 …).
    - Mientras el lote no se complete NO sale otro lote de la cola.
