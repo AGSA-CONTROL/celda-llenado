@@ -372,6 +372,7 @@ bool sensorTapaInd(){ return tapaIndCont >= TAPA_IND_DEBOUNCE_TICKS; }
    AL PRENDER: el Arduino lo EXTIENDE solo. Extendido = los vasos se van a la MERMA (rechazo).
    VASO BUENO en Calidad (E3): se RETRAE para dejar libre el conducto y que el vaso caiga al carro AGV;
      se queda retraído el TIEMPO RETRAÍDO (T_RETRAIDO_MS, se calibra en el HMI) y luego se vuelve a EXTENDER.
+     El tiempo retraído se empieza a contar cuando la estación de LLENADO termina de dispensar.
    Vaso rechazado: el actuador no se mueve (ya está extendido hacia la merma).
 
    CÓMO CALIBRARLO (HMI > Calibración > Actuador lineal, o la consola de la rueda):
@@ -498,7 +499,10 @@ void actualizarActuador() {
       if (ahora - actT0 >= T_ACT_REGRESO_MS) { actGirar(0); actEstado = ACT_SOSTENIDO; actTRet = ahora; }   // retraído: se para y cuenta el tiempo
       break;
     case ACT_SOSTENIDO: {
-      // se queda retraído el TIEMPO RETRAÍDO calibrado (deja pasar el recipiente) y luego se extiende
+      // se queda retraído el TIEMPO RETRAÍDO calibrado (deja pasar el recipiente) y luego se extiende.
+      // El conteo EMPIEZA cuando la estación de Llenado termina de dispensar: mientras dispensa
+      // (o vibra, o espera su OK) el reloj se queda en cero y el actuador sigue retraído.
+      if (llenadoEnCurso()) actTRet = ahora;
       if (ahora - actTRet >= T_RETRAIDO_MS) {
         actGirar(1);                         // vuelve a extender (merma)
         actT0 = ahora;
@@ -726,6 +730,10 @@ void tareasEstaciones(long dt){
 /* Pide OK SOLO si el sensor de esa estación detecta un recipiente:
    E1 (Pin 8) -> OK_LLENADO · E2 (Pin 11) -> OK_TAPADO · E3 (Pin 10) -> OK_VERIF.
    Sensor libre = no pide confirmación y la rueda puede avanzar. */
+/* ¿la estación de Llenado (E1) está dispensando? (tiene vaso esperando su OK, vibra, o termina de vibrar) */
+bool llenadoEnCurso(){
+  return (requiereOk(1) && !okLatch[1]) || (motorDcOn && !vibManual) || okLlenadoPend || vibFinHasta != 0;
+}
 bool requiereOk(uint8_t s){
   if(s == 0 || !hayOrificio(s)) return false;
   if(s == 2 && modoAuto) return false;     // E2 (Tapado) en automático: sin OK_TAPADO

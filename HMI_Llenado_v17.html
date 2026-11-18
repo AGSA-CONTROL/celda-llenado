@@ -1347,7 +1347,7 @@ window.ALM_PEDIDO = {};
               <div class="actFila"><span>Tiempo para RETRAER <small class="actSub">(paso al carro · write 180)</small></span>
                 <button class="btn sm" type="button" data-act="reg:-100">−</button><input type="number" id="actReg" min="50" max="20000" step="10" value="1136"><em>ms</em><button class="btn sm" type="button" data-act="reg:100">+</button>
                 <button class="btn sm green" type="button" id="actProbarReg">◀ Probar retraer</button></div>
-              <div class="actFila"><span>Tiempo RETRAÍDO <small class="actSub">(deja pasar el recipiente al carro)</small></span>
+              <div class="actFila"><span>Tiempo RETRAÍDO <small class="actSub">(deja pasar el recipiente al carro · se cuenta desde que Llenado termina de dispensar)</small></span>
                 <button class="btn sm" type="button" data-rt="-0.5">−</button><input type="number" id="actRt" min="0.5" max="60" step="0.5" value="10"><em>s</em><button class="btn sm" type="button" data-rt="0.5">+</button>
                 <button class="btn sm green" type="button" id="actProbarCiclo">▶ Probar paso del vaso</button></div>
               <div class="actFila"><span>Velocidad</span>
@@ -2893,8 +2893,15 @@ function actVisual(tipo){
     svg.classList.add("act-ok");
     txt.textContent = "APROBADO · el actuador se retrae y el vaso pasa al carro"; txt.className = "status run";
     T(() => svg.classList.add("act-drop"), ACT_VIS.ext);                       // retraído: el vaso pasa al carro
-    T(() => svg.classList.remove("act-ok"), ACT_VIS.ext + ACT_VIS.hold);       // se vuelve a extender
-    T(() => { svg.classList.remove("act-drop"); reposo(); }, ACT_VIS.ext + ACT_VIS.hold + ACT_VIS.ret);
+    /* igual que el Arduino: el tiempo retraído se empieza a contar cuando Llenado termina de dispensar */
+    const llenando = () => !!(window.DISP && DISP.estado && DISP.estado().dispensando);
+    const esperar = () => {
+      if(llenando()){ txt.textContent = "RETRAÍDO · espera a que Llenado termine de dispensar"; return T(esperar, 200); }
+      txt.textContent = `RETRAÍDO · ${(ACT_VIS.hold / 1000).toFixed(1)} s para que pase el recipiente`;
+      T(() => svg.classList.remove("act-ok"), ACT_VIS.hold);                   // se vuelve a extender
+      T(() => { svg.classList.remove("act-drop"); reposo(); }, ACT_VIS.hold + ACT_VIS.ret);
+    };
+    T(esperar, ACT_VIS.ext);
   } else {
     svg.classList.add("act-rej");                                              // sigue extendido
     txt.textContent = "RECHAZADO · sigue extendido, el vaso va a la merma"; txt.className = "status stop";
