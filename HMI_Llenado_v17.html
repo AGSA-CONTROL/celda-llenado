@@ -3540,6 +3540,14 @@ const AGV = (() => {
       render(); renderTodo(); return true;
     },
     paro(on){ if(st.usar && st.online) servidor({ tipo:"agv_cmd", cmd:"paro", on:!!on }); },
+    /* se canceló el lote (paro de emergencia / cancelar): el carro tira ese lote y queda listo en HOME */
+    cancelar(){
+      st.cerrado = false;
+      if(!st.usar) return;
+      servidor({ tipo:"agv_cmd", cmd:"cancelar" });
+      log("🛑 Lote cancelado: se le avisó al carro (quita los vasos que tenga).");
+      avisarDisponibilidad(true); render(); renderTodo();
+    },
     remoto, render, chip
   };
 
@@ -4781,8 +4789,12 @@ procesar = function (msg) {
   if (msg === "EMERGENCIA" && LV.activo) {
     if (LV.activo.id) tiendaEstado(LV.activo.id, "error", { msg: "Paro de emergencia: se canceló tu pedido." });
     LV.activo = null;
+    if (window.AGV) AGV.cancelar();                    // el carro también tira ese lote
   }
-  if (msg === "CANCELADO" && LV.activo) { log("Lote cancelado: ya no se espera su verificación."); LV.activo = null; }
+  if (msg === "CANCELADO" && LV.activo) {
+    log("Lote cancelado: ya no se espera su verificación."); LV.activo = null;
+    if (window.AGV) AGV.cancelar();
+  }
   if ((msg === "EMERGENCIA" || msg === "CANCELADO") && typeof CTL !== "undefined" && CTL.gin.conectado) enviarCtl("gin", "VIB:0");
   procesarLote(msg);
   if (msg.startsWith("ERR,")) { devolverRepo(env); render(); }

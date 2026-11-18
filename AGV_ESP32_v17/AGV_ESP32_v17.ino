@@ -1794,6 +1794,13 @@ void procesarServidor(uint8_t* payload, size_t length) {
       carroVaso(doc["g"] | 0);
     } else if (strcmp(cmd, "paro") == 0) {
       carroParo(doc["on"] | false);
+    } else if (strcmp(cmd, "cancelar") == 0) {           // el HMI canceló el lote (paro / cancelar)
+      if (carroEstado == CARRO_CARGA) {
+        carroVasosN = 0; carroEsperaDest = false; carroModoDest = 0;
+        carroLoteIdJson = "null"; carroDestino = 0;
+        Serial.println(F("Carro: el HMI canceló el lote. Quita los vasos del carro."));
+        enviarTelemetria();
+      } else Serial.println(F("Carro: el HMI canceló un lote, pero el carro ya va en camino."));
     }
   }
 }

@@ -921,7 +921,17 @@ function deHmi(m){
     case "despachar": salir(m.lote || {}); break;
     case "vaso": if(m.g >= 1 && m.g <= 3) vasoCae(m.g); break;
     case "paro": paro(!!m.on); break;
+    case "cancelar": cancelarLote(); break;
   }
+}
+/* el HMI canceló el lote (paro de emergencia o "Cancelar"): se tira ese lote y el carro queda listo en HOME */
+function cancelarLote(){
+  if(st.estado !== "CARGA" && st.estado !== "ESPERA_DESTINO"){ log("🛑 El HMI canceló un lote, pero el carro ya va en camino: sigue su viaje."); return; }
+  const n = st.vasos.length;
+  st.vasos = []; st.lote = null; st.estado = "CARGA";
+  log(`🛑 El HMI canceló el lote.${n ? " Quita los " + n + " vaso(s) que quedaron en el carro." : ""}`);
+  avisarCtl(`🛑 Lote cancelado desde el HMI.${n ? " Quita los vasos del carro." : ""}`, true);
+  publicar(true);
 }
 let ultPub = 0, ultFuerte = 0;
 function publicar(forzar){
