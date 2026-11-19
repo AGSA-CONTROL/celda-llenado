@@ -3550,6 +3550,8 @@ const AGV = (() => {
     puedeRecibir: () => puedeRecibir(),
     vasosCarro: () => (st.usar && st.online && st.estado === "CARGA") ? (st.vasos || []) : null,   // vasos aprobados ya en el carro
     vasoCae(g){ if(st.usar) servidor({ tipo:"agv_cmd", cmd:"vaso", g }); },
+    /* v17: quita UN vaso de ese grano del carro (vaso rechazado); quedan = los que deben seguir en el carro */
+    quitarVaso(g, quedan){ if(st.usar) servidor({ tipo:"agv_cmd", cmd:"quitar", g, quedan:(quedan || []).slice() }); },
     despachar(lote){
       if(!st.usar) return false;
       const destino = lote && lote.id && ALM_PEDIDO[lote.id] || 0;     // el almacén que eligió la tienda (0 = lo eligen en el carro)
@@ -4665,6 +4667,7 @@ iniciar();
     }
     if (msg.startsWith("PEDIDO_OK,")) {
       const h = parseInt(msg.split(",")[1], 10) || 0;
+      carroPoner(a.grano);                                 // v17: el vaso servido aparece en el carro (igual que en la tienda)
       estado(a.id, "vaso_listo", { vaso: h });
       return estado(a.id, "esperando_vaso", { vaso: h + 1, msg: `Retira el vaso ${h} y coloca el vaso ${h + 1}.` });
     }
@@ -4673,6 +4676,7 @@ iniciar();
       case "SIN_VASO": a.pausa = true; estado(a.id, "esperando_vaso", { vaso, msg: "No detecto el vaso. Colócalo en la estación para continuar." }); break;
       case "DETENIDO": a.pausa = true; estado(a.id, "pausa", { msg: "Tu pedido está en pausa. Un momento…" }); break;
       case "CICLO_OK":
+        carroPoner(a.grano);
         estado(a.id, "vaso_listo", { vaso: LOTE });
         if (LV.activo && LV.activo.id === a.id) estado(a.id, "pausa", { msg: "Verificando la calidad de tus vasos…" });   // "listo" llega al completar el lote
         else estado(a.id, "listo", { msg: "¡Pedido completo! Retira tu último vaso." });
@@ -4751,7 +4755,7 @@ function cerrarCarro() {
 function caida(g) {
   if (!(g >= 1 && g <= N)) return;
   LV.pendCaida = Math.max(0, LV.pendCaida - 1);
-  if (window.AGV) window.AGV.vasoCae(g);                // el vaso aprobado cae al carro
+  /* v17: el vaso ya se puso en el carro al servirse (igual que la tienda); aquí solo cuenta para la salida */
   log(`⬇ Vaso de ${cal.granos[g - 1]} cayó al carro.`);
   if (LV.salida && !LV.salida.cerrado) { LV.salida.faltan--; cerrarCarro(); }
 }
@@ -4764,9 +4768,20 @@ function ginTick(d) {
   const enTapado = d.cups && d.cups[2] === "F";         // vaso lleno sin tapa en Tapado = ciclo de tapado en curso
   if (s.tapaFin || !enTapado || Date.now() - s.tCerrado > 20000) salidaLista();
 }
+/* v17: EL CARRO SIGUE A LA TIENDA. El vaso se pone en el carro en cuanto se sirve (cuando la tienda lo marca
+   listo) y se quita si Verificación lo rechaza. LV.enCarro = granos que el carro muestra para el lote. */
+LV.enCarro = [];
+function carroPoner(g) {
+  if (!(g >= 1 && g <= N) || !LV.activo || !window.AGV || !window.AGV.habilitado()) return;
+  LV.enCarro.push(g); window.AGV.vasoCae(g);
+}
+function carroQuitar(g) {
+  const i = LV.enCarro.lastIndexOf(g); if (i < 0 || !window.AGV) return;
+  LV.enCarro.splice(i, 1); window.AGV.quitarVaso(g, LV.enCarro);
+}
 function terminarLote(completo) {
   const a = LV.activo; if (!a) return;
-  LV.activo = null;
+  LV.activo = null; LV.enCarro = [];
   if (completo && window.AGV && window.AGV.habilitado()) {
     avisar(`✔ Lote completo y verificado: ${resumenLote(a.p)}` + (a.rech ? ` (${a.rech} vaso${a.rech > 1 ? "s" : ""} repuesto${a.rech > 1 ? "s" : ""})` : "") + ". El carro sale cuando el último vaso caiga.");
     LV.salida = { id: a.id, p: a.p, faltan: LV.pendCaida, cerrado: false };
@@ -4795,6 +4810,7 @@ function verif(linea) {
     log(`✔ Verificación OK: ${cal.granos[g]}.`);
   } else {
     a.repo[g]++; a.rech++;
+    carroQuitar(g + 1);                                   // v17: la tienda lo quita de sus vasos listos: el carro también
     if (typeof VOZ !== "undefined") VOZ.decir("calidad");     // VOZ: en cuanto Verificación rechaza un vaso
     avisar(`Rechazo en verificación: ${cal.granos[g]}. Se vuelve a dispensar para completar el lote.`, true);
     if (a.id) tiendaEstado(a.id, "pausa", { grano: g + 1, rechazo: true, msg: `Un vaso de ${cal.granos[g]} no pasó la verificación. Lo vamos a servir de nuevo…` });
@@ -4827,7 +4843,7 @@ pumpCola = function () {
   const antes = st.enviando;
   pumpLote();
   if (st.enviando && st.enviando !== antes)
-    LV.activo = { p: st.enviando.slice(), bien: [0, 0, 0], repo: [0, 0, 0], rech: 0, id: st.enviando.id || null };
+    { LV.activo = { p: st.enviando.slice(), bien: [0, 0, 0], repo: [0, 0, 0], rech: 0, id: st.enviando.id || null }; LV.enCarro = []; }
 };
 const procesarLote = procesar;
 procesar = function (msg) {
@@ -4841,11 +4857,11 @@ procesar = function (msg) {
   if (msg === "SIN_VASO") MIDE.pausa();
   if (msg === "EMERGENCIA" && LV.activo) {
     if (LV.activo.id) tiendaEstado(LV.activo.id, "error", { msg: "Paro de emergencia: se canceló tu pedido." });
-    LV.activo = null;
+    LV.activo = null; LV.enCarro = [];
     if (window.AGV) AGV.cancelar();                    // el carro también tira ese lote
   }
   if (msg === "CANCELADO" && LV.activo) {
-    log("Lote cancelado: ya no se espera su verificación."); LV.activo = null;
+    log("Lote cancelado: ya no se espera su verificación."); LV.activo = null; LV.enCarro = [];
     if (window.AGV) AGV.cancelar();
   }
   if ((msg === "EMERGENCIA" || msg === "CANCELADO") && typeof CTL !== "undefined" && CTL.gin.conectado) enviarCtl("gin", "VIB:0");

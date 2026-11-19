@@ -466,6 +466,13 @@ wss.on("connection", (ws, req) => {
       S.tiendas.forEach(t => enviar(t, S.ultimaDisp));
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "agv_cmd") {
       if (m.cmd === "cancelar" && S.agv && S.agv === S.agvEsp) quitarVasosEsp(S);   // lote cancelado / reset
+      if (m.cmd === "quitar" && S.agv && S.agv === S.agvEsp) {   // v17: el ESP32 no sabe quitar UN vaso: se vacía y se le ponen los que quedan
+        const quedan = (Array.isArray(m.quedan) ? m.quedan : []).map(Number).filter(g => g >= 1 && g <= 3).slice(0, 6);
+        quitarVasosEsp(S);
+        enviar(S.agv, { tipo: "agv_cmd", cmd: "cancelar" });
+        quedan.forEach(g => enviar(S.agv, { tipo: "agv_cmd", cmd: "vaso", g }));
+        return;
+      }
       enviar(S.agv, m);
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "estado") {
       const r = S.pedidos.get(m.id);

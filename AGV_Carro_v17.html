@@ -668,6 +668,13 @@ function vasoCae(g){
   else { st.piso++; log("⚠ Un vaso aprobado cayó al piso: el carro no estaba en carga."); evento("piso"); toast("⚠ ¡Un vaso cayó al piso!"); }
   render(); publicar(true);
 }
+/* v17: el carro sigue a la tienda: si Verificación rechaza un vaso, se quita del carro */
+function quitarVaso(g){
+  if(st.estado !== "CARGA" && st.estado !== "ESPERA_DESTINO") return;
+  const i = st.vasos.lastIndexOf(Number(g)); if(i < 0) return;
+  st.vasos.splice(i, 1); log("Se quitó un vaso rechazado del carro.");
+  render(); publicar(true);
+}
 function paro(on){
   if(!MODO_SIM){ ctl("paro", { on:!!on }); log(on ? "⛔ Orden enviada: detener el carro." : "▶ Orden enviada: continuar."); return; }
   st.pausado = !!on;
@@ -932,6 +939,7 @@ function deHmi(m){
   switch(m.cmd){
     case "despachar": salir(m.lote || {}); break;
     case "vaso": if(m.g >= 1 && m.g <= 3) vasoCae(m.g); break;
+    case "quitar": quitarVaso(m.g); break;                 // v17: vaso rechazado en Verificación (la tienda lo quitó)
     case "paro": paro(!!m.on); break;
     case "cancelar": cancelarLote(); break;
   }
