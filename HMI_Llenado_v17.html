@@ -3916,6 +3916,21 @@ function construirVueltas() {
 function agMover(i, g) {                                 // mueve el servo YA al ángulo (para ver dónde queda)
   vtComando(`M,${i + 1},${g}`, `Servo ${i + 1} (${cal.granos[i]}): mover a ${g}°`);
 }
+/* MEDICIÓN: cuánto tiempo estuvo abierta de verdad la compuerta, en la prueba y en automático,
+   para comparar con lo calibrado (se ve en el Registro). */
+const MIDE = {
+  t0: 0, tipo: "", i: -1, pausas: 0,
+  ini(tipo, i) { this.t0 = performance.now(); this.tipo = tipo; this.i = i; this.pausas = 0; },
+  pausa() { if (this.tipo === "auto") this.pausas++; },
+  fin(tipo, i) {
+    if (this.tipo !== tipo || this.i !== i || !this.t0) return;
+    const real = Math.round(performance.now() - this.t0), k = VT.k[i] || 1, ms = VT.ms[i] || 0;
+    const esperado = k * ms + (k - 1) * (VT.pausa || 0);
+    log(`⏱ ${tipo === "prueba" ? "PRUEBA" : "AUTOMÁTICO"} · ${cal.granos[i]}: compuerta ${real} ms (calibrado ${esperado} ms = ${k} × ${ms} ms${k > 1 ? " + pausas" : ""})`
+      + (this.pausas ? ` · ⚠ se pausó ${this.pausas} ${this.pausas > 1 ? "veces" : "vez"} porque E2 dejó de ver el vaso` : ""));
+    this.t0 = 0;
+  }
+};
 function vtAviso(txt, mal) { const e = $("vtInfo"); e.textContent = txt; e.style.color = mal ? "#ff6b6b" : ""; }
 function vtComando(c, desc, sinEspera) {
   if (!link) { vtAviso("✖ El puerto Dispensado no está conectado. Conéctalo en la pestaña Comunicación.", true); return false; }
@@ -4001,7 +4016,8 @@ function procesarVueltas(msg) {                          // true si el mensaje e
   if (p[0] === "PRUEBA" || p[0] === "PRUEBA_OK") {
     const i = +p[1] - 1, nom = i >= 0 && i < N ? `Servo ${i + 1} (${cal.granos[i]})` : "Servo";
     const txt = p[0] === "PRUEBA" ? `${nom}: abriendo y cerrando ${p[2]} ${+p[2] > 1 ? "veces" : "vez"}…` : `${nom}: terminó la porción de prueba. ¿Cayó lo que querías? Si no, cambia el tiempo o las veces.`;
-    if (i >= 0 && i < N && p[0] === "PRUEBA_OK") { VT.ang[i] = VT.c[i]; pintarVueltas(true); vtVibrar(false); }
+    if (i >= 0 && i < N && p[0] === "PRUEBA") MIDE.ini("prueba", i);
+    if (i >= 0 && i < N && p[0] === "PRUEBA_OK") { VT.ang[i] = VT.c[i]; pintarVueltas(true); vtVibrar(false); MIDE.fin("prueba", i); }
     log(txt); vtAviso(txt); return true;
   }
   return false;
@@ -4818,8 +4834,11 @@ procesar = function (msg) {
   const env = st.enviando;
   if (msg.startsWith("PORCION,")) {
     LV.ultGrano = parseInt(msg.split(",")[1], 10) || 0; LV.tPorcion = performance.now();
+    MIDE.ini("auto", LV.ultGrano - 1);
     if (typeof CTL !== "undefined" && CTL.gin.conectado) enviarCtl("gin", "VIB:1");   // v13: el vibrador solo vibra al dispensar
   }
+  if (msg.startsWith("CAYENDO")) MIDE.fin("auto", LV.ultGrano - 1);
+  if (msg === "SIN_VASO") MIDE.pausa();
   if (msg === "EMERGENCIA" && LV.activo) {
     if (LV.activo.id) tiendaEstado(LV.activo.id, "error", { msg: "Paro de emergencia: se canceló tu pedido." });
     LV.activo = null;
