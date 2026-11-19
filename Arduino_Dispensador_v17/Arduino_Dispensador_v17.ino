@@ -22,7 +22,7 @@
 
    CONEXIONES (las mismas de antes, sin el HX711)
      Tolva 1 (frijol):   HC-SR04 TRIG -> D7    ECHO -> D8     Servo 1 señal -> D9
-     Tolva 2 (arroz)   : HC-SR04 TRIG -> D4    ECHO -> D5     Servo 2 señal -> D10
+     Tolva 2 (f. negro): HC-SR04 TRIG -> D4    ECHO -> D5     Servo 2 señal -> D10
      Tolva 3 (maíz):     HC-SR04 TRIG -> D6    ECHO -> D12    Servo 3 señal -> D11
      HC-SR04: VCC -> 5V Arduino, GND -> GND.
      Servos: + y - a la fuente EXTERNA de 5 V (con fusible), GND de la fuente unido al GND del Arduino.

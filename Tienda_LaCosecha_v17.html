@@ -549,7 +549,7 @@ body{background:
           <g class="almT" id="almT3"><rect x="143" y="14" width="84" height="38" rx="6"/><text x="185" y="39" text-anchor="middle">Almacén 3</text><path class="chk" d="M233 26l7 7 13-14" fill="none" stroke="#6cc08b" stroke-width="5" stroke-linecap="round"/></g>
           <g id="carroT">
             <rect x="-20" y="-14" width="40" height="28" rx="6" fill="#e2cfa3" stroke="#3a2a17" stroke-width="2.5"/>
-            <circle cx="-8" cy="-4" r="4.5" fill="#5a2a3c"/><circle cx="3" cy="-4" r="4.5" fill="#f2b632"/><circle cx="-3" cy="6" r="4.5" fill="#ece6d6"/>
+            <circle cx="-8" cy="-4" r="4.5" fill="#5a2a3c"/><circle cx="3" cy="-4" r="4.5" fill="#f2b632"/><circle cx="-3" cy="6" r="4.5" fill="#2a2230" stroke="#6a5a7e" stroke-width="1"/>
             <rect x="12" y="-5" width="5" height="10" rx="1.5" fill="#173326"/>
           </g>
         </svg>
@@ -582,8 +582,8 @@ body{background:
 const GRANOS = [
   { n: "Frijol",   c: "#5a2a3c", k: "#2b1420", h: "#8a4a62", forma: "frijol",
     dato: "Rico en proteína y fibra. En México se cultiva desde hace miles de años." },
-  { n: "Arroz",    c: "#ece6d6", k: "#a99d80", h: "#ffffff", forma: "arroz",
-    dato: "Uno de los cereales más consumidos del mundo; en México acompaña muchos platillos." },
+  { n: "Frijol negro", c: "#2a2230", k: "#100b16", h: "#6a5a7e", forma: "frijolnegro",
+    dato: "Muy popular en el sur de México; rico en proteína, hierro y antioxidantes." },
   { n: "Maíz",     c: "#f2b632", k: "#c98a0e", h: "#ffdd7a", forma: "maiz",
     dato: "Es la base de la tortilla. México tiene más de 50 razas nativas de maíz." }
 ];
@@ -614,8 +614,8 @@ function azar(sem) { let s = sem; return () => (s = (s * 9301 + 49297) % 233280)
 /* ===== Dibujos ===== */
 function granoSvg(g, x, y, rot) {
   const f = g.forma;
-  const rx = f === "frijol" ? 7.5 : f === "arroz" ? 6.4 : 5.2;    // el arroz: grano largo y delgado
-  const ry = f === "frijol" ? 4.6 : f === "arroz" ? 2.3 : 6.8;
+  const rx = f === "frijol" ? 7.5 : f === "frijolnegro" ? 6.6 : 5.2;   // el frijol negro: un poco más chico
+  const ry = f === "frijol" ? 4.6 : f === "frijolnegro" ? 4.2 : 6.8;
   return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx}" ry="${ry}" transform="rotate(${rot.toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" fill="url(#gr-${f})" stroke="${g.k}" stroke-width=".8"/>`;
 }
 function defsGranos() {
