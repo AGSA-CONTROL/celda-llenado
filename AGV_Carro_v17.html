@@ -786,6 +786,7 @@ function delCarro(m){                                   // agv_estado del ESP32 
   st.estado = m.estado || "CARGA"; st.pausado = !!m.pausado; st.vasos = m.vasos || [];
   st.lote = m.lote || null; st.entregas = m.entregas || [0, 0, 0]; st.piso = m.piso || 0; st.linea = m.linea || "";
   let s = Number(m.s) || 0;
+  if(st.estado === "DESCARGANDO" && L) s = S.a2;              // descargando: en el dibujo siempre está en el único almacén
   if(st.estado === "REGRESANDO" && s < ESP.sTel - L / 2) s += L;
   ESP.movia = Math.abs(s - ESP.sTel) > 0.5; ESP.sTel = s; ESP.tTel = performance.now();
   if(!ESP.camposListos){
