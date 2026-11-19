@@ -1164,7 +1164,7 @@ window.ALM_PEDIDO = {};
       <ol class="ayuda vtPasos">
         <li><b>Cerrado:</b> con <b>−</b> y <b>+</b> mueve el servo hasta que la compuerta tape bien la tolva (no debe caer grano).</li>
         <li><b>Abierto:</b> igual, hasta que la compuerta quede abierta y caiga el grano.</li>
-        <li><b>Tiempo abierto</b> y <b>veces</b>: cuánto tiempo se queda abierta y cuántas veces abre para llenar un recipiente. Con <b>"Probar porción"</b> lo ves.</li>
+        <li><b>Tiempo abierto</b> y <b>veces</b>: cuánto tiempo se queda abierta y cuántas veces abre para llenar un recipiente. Con <b>"Probar porción"</b> lo ves: el <b>vibrador</b> de la rueda prende igual que en automático (si la rueda está conectada), para que lo que calibres sea lo mismo que sale en automático.</li>
       </ol>
       <p class="ayuda">El servo se mueve en cuanto cambias los grados. Cuando las 3 queden bien, pulsa <b>"Guardar en el Arduino"</b> (no se borra al apagarlo).</p>
       <div id="dsp-filasVueltas"></div>
@@ -3943,7 +3943,20 @@ function vtProbar(i) {                                   // guarda lo de ese ser
   const x = vtValores(i); if (!x) return;
   if (!link || !st.listo || st.dispensando) return vtComando("", "");
   tx(vtLinea(i, x));
-  vtComando(`T,${i + 1},${x.k}`, `Servo ${i + 1}: probar porción (abre ${x.k} ${x.k > 1 ? "veces" : "vez"} ${x.ms} ms)`);
+  if (vtComando(`T,${i + 1},${x.k}`, `Servo ${i + 1}: probar porción (abre ${x.k} ${x.k > 1 ? "veces" : "vez"} ${x.ms} ms)`)) vtVibrar(true, x.k * x.ms + (x.k - 1) * (VT.pausa || 0));
+}
+/* La prueba vibra IGUAL que en automático: el vibrador prende al abrir la compuerta y sigue 3 s
+   después de cerrar (en automático la rueda vibra T_VIB_EXTRA_MS = 3 s al terminar). */
+function vtVibrar(on, durMs) {
+  if (typeof CTL === "undefined" || !CTL.gin.conectado) return;
+  const v = window.VIBR ? VIBR.estado() : {};
+  if (v.manual) return;                                   // lo prendieron con el botón: no se toca
+  clearTimeout(VT.tVib);
+  if (on) {
+    enviarCtl("gin", "VIB:1"); VT.vibPrueba = true;
+    VT.tVib = setTimeout(() => vtVibrar(false), (durMs || 0) + 4000);   // por si no llega PRUEBA_OK
+  }
+  else if (VT.vibPrueba) VT.tVib = setTimeout(() => { VT.vibPrueba = false; enviarCtl("gin", "VIB:0"); }, 3000);
 }
 function vtGuardarTodo() {
   if (!link || !st.listo || st.dispensando) return vtComando("", "");
@@ -3988,7 +4001,7 @@ function procesarVueltas(msg) {                          // true si el mensaje e
   if (p[0] === "PRUEBA" || p[0] === "PRUEBA_OK") {
     const i = +p[1] - 1, nom = i >= 0 && i < N ? `Servo ${i + 1} (${cal.granos[i]})` : "Servo";
     const txt = p[0] === "PRUEBA" ? `${nom}: abriendo y cerrando ${p[2]} ${+p[2] > 1 ? "veces" : "vez"}…` : `${nom}: terminó la porción de prueba. ¿Cayó lo que querías? Si no, cambia el tiempo o las veces.`;
-    if (i >= 0 && i < N && p[0] === "PRUEBA_OK") { VT.ang[i] = VT.c[i]; pintarVueltas(true); }
+    if (i >= 0 && i < N && p[0] === "PRUEBA_OK") { VT.ang[i] = VT.c[i]; pintarVueltas(true); vtVibrar(false); }
     log(txt); vtAviso(txt); return true;
   }
   return false;
