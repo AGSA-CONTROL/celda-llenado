@@ -712,7 +712,12 @@ void tareasEstaciones(long dt){
   if(!vaso[3].verificado && (!vaso[3].presente || sensorVisto[3] || esperaVencida[3])){
     vaso[3].verificado = true;
     if(vaso[3].presente && sensorVisto[3]){ if(vaso[3].cuenta){ buenos++; Serial.println("CUENTA,BUENO"); } dispararActuador(); reportarVerif(vaso[3].grano, true); }   // dispensado + tapa (pin 10): bueno -> se retrae
-    else if(vaso[3].presente) actuadorAMerma();                                                                                   // rechazo: extendido hacia la merma
+    else if(vaso[3].presente){                                   // RECHAZO (sin tapa): se avisa YA, no hasta que la rueda gire
+      vaso[3].rech = true;                                       // así el HMI manda al dispensador la reposición enseguida y el vaso
+      if(vaso[3].cuenta){ rech++; Serial.println("CUENTA,RECHAZO"); }   // vacío que está en Llenado se sirve (antes se quedaba esperando
+      reportarVerif(vaso[3].grano, false);                       // el OK de Llenado y la rueda se paraba)
+      actuadorAMerma();                                          // extendido hacia la merma
+    }
   }
 }
 
@@ -800,7 +805,7 @@ void iniciarIndexado(){
 }
 
 void completarIndexado(){
-  if(vaso[3].presente && !sensorVisto[3]){             // sin tapa en E3 (S3) = RECHAZO
+  if(vaso[3].presente && !vaso[3].rech && !vaso[3].verificado && !sensorVisto[3]){   // sin tapa en E3 (S3) = RECHAZO (si no se decidió antes)
     vaso[3].rech = true;
     if(vaso[3].cuenta){ rech++; Serial.println("CUENTA,RECHAZO"); }
     reportarVerif(vaso[3].grano, false);
