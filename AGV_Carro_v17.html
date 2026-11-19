@@ -76,6 +76,12 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .titulo .sub{margin:0}
 .tablero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .tablero .fEstado,.tablero .fVasos{grid-column:1/-1}
+/* v17: conteo de la espera antes de salir (lo manda el HMI) */
+.conteo{margin-top:8px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px;padding:8px 12px;border-radius:8px;background:var(--inset);border:1px solid var(--border);border-left:5px solid #f5a623;font-size:13px}
+.conteo b{font:800 22px/1 Consolas,Menlo,monospace;color:#f5a623}
+.conteo i{grid-column:1/-1;height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.conteo em{display:block;height:100%;width:0;background:#f5a623;transition:width .25s linear}
+.conteo.espera{border-left-color:#4aa3ff}.conteo.espera b{color:#4aa3ff}
 .fVasos .vasos{min-height:44px}
 .btnVaciar{margin-left:auto;font:inherit;font-size:11px;letter-spacing:.5px;font-weight:800;padding:4px 10px;border-radius:8px;border:1px solid var(--red);background:rgba(229,72,77,.12);color:var(--text);cursor:pointer;text-transform:none}
 .dest svg{display:none!important}
@@ -297,7 +303,8 @@ pre.proto{max-height:none}
       <div class="lado">
     <div class="tablero">
       <div class="ficha fEstado"><span class="flbl">Estado del carro</span>
-        <div class="estado" id="estado"><b>—</b><small></small></div></div>
+        <div class="estado" id="estado"><b>—</b><small></small></div>
+        <div class="conteo" id="conteo" hidden><span id="conteoTxt"></span><b id="conteoNum"></b><i><em id="conteoBarra"></em></i></div></div>
       <div class="ficha"><span class="flbl">Destino del lote</span>
         <div class="dest"><svg id="qr" viewBox="0 0 25 25" aria-label="Código QR del almacén de destino"></svg>
           <div><b id="destTxt">—</b><small id="destSub"></small></div></div></div>
@@ -668,6 +675,31 @@ function vasoCae(g){
   else { st.piso++; log("⚠ Un vaso aprobado cayó al piso: el carro no estaba en carga."); evento("piso"); toast("⚠ ¡Un vaso cayó al piso!"); }
   render(); publicar(true);
 }
+/* v17: CONTEO antes de salir. El HMI avisa: "estacion" = lote completo, esperando que la rueda cambie de estación;
+   "conteo" = ya cambió, faltan <resta> s de <total>. Aquí se cuenta solo entre avisos. */
+const CONTEO = { fase:"", total:0, fin:0, t:0 };
+function deConteo(m){
+  CONTEO.fase = m.fase || ""; CONTEO.total = Number(m.total) || 0; CONTEO.t = performance.now();
+  if(CONTEO.fase === "conteo") CONTEO.fin = performance.now() + (Number(m.resta) || 0) * 1000;
+  pintarConteo();
+}
+function pintarConteo(){
+  const box = $("#conteo"); if(!box) return;
+  if(CONTEO.fase && performance.now() - CONTEO.t > 6000) CONTEO.fase = "";   // el HMI dejó de avisar
+  box.hidden = !CONTEO.fase;
+  if(!CONTEO.fase) return;
+  box.classList.toggle("espera", CONTEO.fase === "estacion");
+  if(CONTEO.fase === "estacion"){
+    $("#conteoTxt").textContent = "Lote completo. Esperando que la rueda cambie de estación para empezar el conteo…";
+    $("#conteoNum").textContent = CONTEO.total.toFixed(1) + " s"; $("#conteoBarra").style.width = "0%";
+  } else {
+    const resta = Math.max(0, (CONTEO.fin - performance.now()) / 1000);
+    $("#conteoTxt").textContent = resta > 0 ? "La rueda ya cambió de estación. El carro sale en:" : "Terminó la espera: el carro sale…";
+    $("#conteoNum").textContent = resta.toFixed(1) + " s";
+    $("#conteoBarra").style.width = (CONTEO.total ? (1 - resta / CONTEO.total) * 100 : 100).toFixed(1) + "%";
+  }
+}
+pulsoFiable(pintarConteo, 100);
 /* v17: el carro sigue a la tienda: si Verificación rechaza un vaso, se quita del carro */
 function quitarVaso(g){
   if(st.estado !== "CARGA" && st.estado !== "ESPERA_DESTINO") return;
@@ -870,6 +902,7 @@ function conectarServidor(){
     else if(MODO_SIM && m.tipo === "agv_cmd") deHmi(m);
     else if(m.tipo === "error"){ toast("Servidor: " + m.msg); log("⚠ Servidor: " + m.msg); }
     else if(m.tipo === "carros_sala"){ deCarrosSala(m); }
+    else if(m.tipo === "salida_conteo"){ deConteo(m); return; }
     render();
   };
   ws.onclose = () => {

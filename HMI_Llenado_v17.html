@@ -1253,6 +1253,7 @@ window.ALM_PEDIDO = {};
               <label class="chk"><input type="checkbox" id="agvOn"> Usar el carro AGV (no empieza un lote nuevo mientras el carro entrega)</label>
               <label class="chk" style="gap:8px">Espera para que caiga el último vaso al carro antes de salir:
                 <input type="number" id="agvEspCaida" min="0" max="30" step="0.5" style="width:72px;padding:6px 8px;border-radius:8px;background:var(--inset);border:1px solid var(--border2);color:var(--text)"> s</label>
+              <p class="agvNota" style="margin:4px 0 0">El conteo empieza cuando la rueda termina de cambiar de estación (después de que cae el último vaso del lote).</p>
           </section>
           <section class="grp wide" id="cardModo">
             <div class="cardHead"><h3>Modo de trabajo</h3><span class="pill" id="modoPill">—</span></div>
@@ -4738,35 +4739,50 @@ function esperaCaida() { try { const v = parseFloat(localStorage.getItem(ESP_CAI
   inp.value = esperaCaida();
   inp.addEventListener("change", () => { const v = Math.max(0, Math.min(30, parseFloat(inp.value) || 0)); inp.value = v; try { localStorage.setItem(ESP_CAIDA_KEY, String(v)); } catch (_) {} });
 })();
-LV.salida = null;          // { id, p, faltan, cerrado, tCerrado, tapaFin }
+LV.salida = null;          // { id, p, fase:"estacion"|"conteo", giro, t0, tConteo, cerrado }
+/* v17: CUÁNDO SALE EL CARRO. Cuando la tienda dice "lote completo", se espera a que la rueda CAMBIE DE
+   ESTACIÓN (en ese giro cae el último vaso al carro). Desde ese cambio empieza el conteo de la espera
+   (Comunicación > Carro AGV) y al terminar el conteo el carro sale. La página del carro muestra el conteo. */
+function avisoConteo(forzar) {
+  const s = LV.salida, now = Date.now();
+  if (!forzar && now - (LV.tAvisoConteo || 0) < 400) return;
+  LV.tAvisoConteo = now;
+  const total = esperaCaida();
+  const o = !s ? { tipo: "salida_conteo", fase: "" }
+    : s.fase === "estacion" ? { tipo: "salida_conteo", fase: "estacion", total }
+    : { tipo: "salida_conteo", fase: "conteo", total, resta: Math.max(0, total - (now - s.tConteo) / 1000) };
+  enviarServidor(o);
+}
 function salidaLista() {
-  const s = LV.salida; if (!s || !s.cerrado) return;
-  LV.salida = null;
-  log(`🚚 El último vaso ya cayó al carro y terminó el tapado: sale el lote ${resumenLote(s.p)}.`);
+  const s = LV.salida; if (!s) return;
+  LV.salida = null; avisoConteo(true);
+  log(`🚚 Terminó la espera de ${esperaCaida()} s: sale el lote ${resumenLote(s.p)}.`);
   const sale = window.AGV && window.AGV.habilitado() && window.AGV.despachar({ id: s.id, p: s.p });
   if (!sale) { if (window.AGV) window.AGV.cerrar(false); if (s.id) tiendaEstado(s.id, "listo", { msg: "¡Pedido completo y verificado!" }); }
 }
-function cerrarCarro() {
-  const s = LV.salida; if (!s || s.cerrado || s.faltan > 0) return;
-  s.cerrado = true; s.tCerrado = Date.now(); s.tapaFin = false;
+function empezarConteo(motivo) {
+  const s = LV.salida; if (!s || s.fase !== "estacion") return;
+  s.fase = "conteo"; s.tConteo = Date.now(); s.cerrado = true;
   if (window.AGV) window.AGV.cerrar(true);             // la rueda ya no suelta vasos buenos: el carro tiene su lote
-  log("✔ Todos los vasos del lote están en el carro. Sale al terminar el ciclo de tapado.");
+  log(`⏱ ${motivo}: empieza el conteo de ${esperaCaida()} s para que salga el carro.`);
+  avisoConteo(true);
 }
 function caida(g) {
   if (!(g >= 1 && g <= N)) return;
   LV.pendCaida = Math.max(0, LV.pendCaida - 1);
-  /* v17: el vaso ya se puso en el carro al servirse (igual que la tienda); aquí solo cuenta para la salida */
   log(`⬇ Vaso de ${cal.granos[g - 1]} cayó al carro.`);
-  if (LV.salida && !LV.salida.cerrado) { LV.salida.faltan--; cerrarCarro(); }
 }
-function tapaFin() { if (LV.salida && LV.salida.cerrado) { LV.salida.tapaFin = true; } }
-/* cada trama de la rueda: con el carro cerrado, sale en cuanto no haya un tapado en curso */
+function tapaFin() { }
+/* cada trama de la rueda: espera el cambio de estación y luego cuenta */
 function ginTick(d) {
-  const s = LV.salida; if (!s || !s.cerrado) return;
-  if (Number(d.estado) === 2) return;                   // girando: aún no se sabe qué quedó en Tapado
-  if (Date.now() - s.tCerrado < esperaCaida() * 1000) return;   // v16: tiempo para que el último vaso termine de caer al carro
-  const enTapado = d.cups && d.cups[2] === "F";         // vaso lleno sin tapa en Tapado = ciclo de tapado en curso
-  if (s.tapaFin || !enTapado || Date.now() - s.tCerrado > 20000) salidaLista();
+  const s = LV.salida; if (!s) return;
+  const e = Number(d.estado);
+  if (s.fase === "estacion") {
+    if (e === 2) s.giro = true;                                        // la rueda está girando
+    else if (s.giro) empezarConteo("La rueda cambió de estación");     // ya terminó de girar: cambió de estación
+    else if (Date.now() - s.t0 > 25000) empezarConteo("La rueda no giró en 25 s");
+  } else if (Date.now() - s.tConteo >= esperaCaida() * 1000) { salidaLista(); return; }
+  avisoConteo(false);
 }
 /* v17: EL CARRO SIGUE A LA TIENDA. El vaso se pone en el carro en cuanto se sirve (cuando la tienda lo marca
    listo) y se quita si Verificación lo rechaza. LV.enCarro = granos que el carro muestra para el lote. */
@@ -4783,10 +4799,10 @@ function terminarLote(completo) {
   const a = LV.activo; if (!a) return;
   LV.activo = null; LV.enCarro = [];
   if (completo && window.AGV && window.AGV.habilitado()) {
-    avisar(`✔ Lote completo y verificado: ${resumenLote(a.p)}` + (a.rech ? ` (${a.rech} vaso${a.rech > 1 ? "s" : ""} repuesto${a.rech > 1 ? "s" : ""})` : "") + ". El carro sale cuando el último vaso caiga.");
-    LV.salida = { id: a.id, p: a.p, faltan: LV.pendCaida, cerrado: false };
-    if (a.id) tiendaEstado(a.id, "pausa", { listoOtro: true, msg: "¡Lote completo y verificado! Sale en el carro cuando la rueda gire con el siguiente pedido." });
-    cerrarCarro();
+    avisar(`✔ Lote completo y verificado: ${resumenLote(a.p)}` + (a.rech ? ` (${a.rech} vaso${a.rech > 1 ? "s" : ""} repuesto${a.rech > 1 ? "s" : ""})` : "") + ". El carro sale cuando la rueda cambie de estación y termine la espera.");
+    LV.salida = { id: a.id, p: a.p, fase: "estacion", giro: false, t0: Date.now(), cerrado: false };
+    if (a.id) tiendaEstado(a.id, "pausa", { listoOtro: true, msg: "¡Lote completo y verificado! El carro sale en cuanto la rueda cambie de estación y termine la espera." });
+    avisoConteo(true);
     render(); pumpCola(); return;
   }
   if (completo) {
@@ -4855,6 +4871,7 @@ procesar = function (msg) {
   }
   if (msg.startsWith("CAYENDO")) MIDE.fin("auto", LV.ultGrano - 1);
   if (msg === "SIN_VASO") MIDE.pausa();
+  if ((msg === "EMERGENCIA" || msg === "CANCELADO") && LV.salida) { LV.salida = null; avisoConteo(true); }   // ya no sale: se quita el conteo
   if (msg === "EMERGENCIA" && LV.activo) {
     if (LV.activo.id) tiendaEstado(LV.activo.id, "error", { msg: "Paro de emergencia: se canceló tu pedido." });
     LV.activo = null; LV.enCarro = [];
