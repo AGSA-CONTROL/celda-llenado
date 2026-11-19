@@ -465,7 +465,7 @@ wss.on("connection", (ws, req) => {
       S.ultimaDisp = { tipo: "disponibilidad", pedir: !!m.pedir, agv: String(m.agv || "").slice(0, 20), msg: String(m.msg || "").slice(0, 160) };
       S.tiendas.forEach(t => enviar(t, S.ultimaDisp));
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "salida_conteo") {   // v17: conteo para que salga el carro -> páginas del carro
-      const o = { tipo: "salida_conteo", fase: ["estacion", "conteo"].includes(m.fase) ? m.fase : "", total: Number(m.total) || 0, resta: Number(m.resta) || 0 };
+      const o = { tipo: "salida_conteo", fase: ["conteo", "vaso"].includes(m.fase) ? m.fase : "", total: Number(m.total) || 0, resta: Number(m.resta) || 0 };
       S.agvPaginas.forEach(p => enviar(p, o)); S.vistas.forEach(v => enviar(v, o));
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "agv_cmd") {
       if (m.cmd === "cancelar" && S.agv && S.agv === S.agvEsp) quitarVasosEsp(S);   // lote cancelado / reset

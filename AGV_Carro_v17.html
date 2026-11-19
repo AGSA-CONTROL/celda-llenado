@@ -675,8 +675,8 @@ function vasoCae(g){
   else { st.piso++; log("⚠ Un vaso aprobado cayó al piso: el carro no estaba en carga."); evento("piso"); toast("⚠ ¡Un vaso cayó al piso!"); }
   render(); publicar(true);
 }
-/* v17: CONTEO antes de salir. El HMI avisa: "estacion" = lote completo, esperando que la rueda cambie de estación;
-   "conteo" = ya cambió, faltan <resta> s de <total>. Aquí se cuenta solo entre avisos. */
+/* v17: CONTEO antes de salir: tiempo que el carro espera en carga antes de ir al almacén. El HMI avisa:
+   "conteo" = faltan <resta> s de <total>; "vaso" = terminó, pero espera a que caiga el último vaso. */
 const CONTEO = { fase:"", total:0, fin:0, t:0 };
 function deConteo(m){
   CONTEO.fase = m.fase || ""; CONTEO.total = Number(m.total) || 0; CONTEO.t = performance.now();
@@ -688,16 +688,12 @@ function pintarConteo(){
   if(CONTEO.fase && performance.now() - CONTEO.t > 6000) CONTEO.fase = "";   // el HMI dejó de avisar
   box.hidden = !CONTEO.fase;
   if(!CONTEO.fase) return;
-  box.classList.toggle("espera", CONTEO.fase === "estacion");
-  if(CONTEO.fase === "estacion"){
-    $("#conteoTxt").textContent = "Lote completo. Esperando que la rueda cambie de estación para empezar el conteo…";
-    $("#conteoNum").textContent = CONTEO.total.toFixed(1) + " s"; $("#conteoBarra").style.width = "0%";
-  } else {
-    const resta = Math.max(0, (CONTEO.fin - performance.now()) / 1000);
-    $("#conteoTxt").textContent = resta > 0 ? "La rueda ya cambió de estación. El carro sale en:" : "Terminó la espera: el carro sale…";
-    $("#conteoNum").textContent = resta.toFixed(1) + " s";
-    $("#conteoBarra").style.width = (CONTEO.total ? (1 - resta / CONTEO.total) * 100 : 100).toFixed(1) + "%";
-  }
+  const resta = CONTEO.fase === "conteo" ? Math.max(0, (CONTEO.fin - performance.now()) / 1000) : 0;
+  box.classList.toggle("espera", CONTEO.fase === "vaso");
+  $("#conteoTxt").textContent = CONTEO.fase === "vaso" ? "Terminó la espera. Falta que caiga el último vaso al carro…"
+    : resta > 0 ? "Lote completo. El carro sale al almacén en:" : "Terminó la espera: el carro sale…";
+  $("#conteoNum").textContent = resta.toFixed(1) + " s";
+  $("#conteoBarra").style.width = (CONTEO.total ? (1 - resta / CONTEO.total) * 100 : 100).toFixed(1) + "%";
 }
 pulsoFiable(pintarConteo, 100);
 /* v17: el carro sigue a la tienda: si Verificación rechaza un vaso, se quita del carro */
