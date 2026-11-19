@@ -2,6 +2,14 @@
   ======================================================================
   SEGUIDOR DE LINEA CON CONTROL PID + HMI WEB + LECTOR QR GM65 - ESP32-S3
   ======================================================================
+  VERSION 9 (celda de llenado v17): QR DE LOS ALMACENES EN CUALQUIER ORDEN.
+    - QR-HOME siempre está en la estación de carga, pero QR-E1, E2 y E3 los pueden poner
+      en cualquier lugar de la pista. El carro siempre busca el CÓDIGO del almacén elegido
+      (no cuenta estaciones), así que descarga bien aunque estén revueltos.
+    - El carro APRENDE SOLO el orden: en la primera vuelta completa desde HOME anota en qué
+      orden leyó los QR (por ejemplo HOME -> E3 -> E1 -> E2) y lo guarda en su memoria.
+      Las páginas acomodan los almacenes del dibujo en ese orden.
+    - También se puede escribir el orden a mano en la página del carro (comando "orden").
   VERSION 8 (celda de llenado v17): botones para elegir el almacén (1, 2, 3 o rotativo) en el panel
     y en la página del carro. El carro se detiene en CADA estación, lee su QR y descarga solo
     en el QR del almacén elegido (QR_PAUSA_PASO_MS = tiempo detenido en las demás).
@@ -1413,7 +1421,43 @@ void setupWebServer() {
 
 // Mismo trazo que el dibujo de la UI (medido sobre la ruta SVG del carro)
 const float CARRO_L = 1754.5f;                          // largo del circuito (px del dibujo)
-const float CARRO_S_ALM[3] = {483.6f, 837.3f, 1280.9f}; // posición de cada almacén en el dibujo
+const float CARRO_S_ALM[3] = {483.6f, 837.3f, 1280.9f}; // posición de los 3 LUGARES de la pista en el dibujo
+// v9: qué almacén (QR-E#) está en cada lugar de la pista, en el orden en que el carro los
+// encuentra al salir de HOME. Se aprende solo en la primera vuelta y se guarda en la memoria.
+uint8_t ordenPista[3] = {1, 2, 3};
+int     vueltaVistos[3] = {0, 0, 0};
+int     vueltaN = -1;                                    // -1 = aún no sabe dónde empezó la vuelta
+float sAlm(int n) {                                      // posición en el dibujo del almacén n
+  for (int i = 0; i < 3; i++) if (ordenPista[i] == n) return CARRO_S_ALM[i];
+  return CARRO_S_ALM[constrain(n, 1, 3) - 1];
+}
+bool ordenValido(const uint8_t* o) {
+  return o[0] >= 1 && o[0] <= 3 && o[1] >= 1 && o[1] <= 3 && o[2] >= 1 && o[2] <= 3 &&
+         o[0] != o[1] && o[0] != o[2] && o[1] != o[2];
+}
+void guardarOrden(const uint8_t* o, const char* porque) {
+  if (!ordenValido(o)) { Serial.println(F("Orden de la pista no valido.")); return; }
+  bool igual = o[0] == ordenPista[0] && o[1] == ordenPista[1] && o[2] == ordenPista[2];
+  for (int i = 0; i < 3; i++) ordenPista[i] = o[i];
+  if (!igual) {
+    prefs.begin("agv", false);
+    prefs.putUShort("orden", ordenPista[0] * 100 + ordenPista[1] * 10 + ordenPista[2]);
+    prefs.end();
+  }
+  Serial.printf("Orden de la pista (%s): HOME -> E%d -> E%d -> E%d -> HOME\n", porque, ordenPista[0], ordenPista[1], ordenPista[2]);
+}
+// cada QR leído: HOME empieza la vuelta; los almacenes se anotan en el orden en que aparecen
+void aprenderOrden(int idx) {
+  if (idx == 0) { vueltaN = 0; return; }
+  if (idx < 1 || idx > 3 || vueltaN < 0 || vueltaN >= 3) return;
+  for (int i = 0; i < vueltaN; i++) if (vueltaVistos[i] == idx) return;   // el mismo QR otra vez
+  vueltaVistos[vueltaN++] = idx;
+  if (vueltaN == 3) {
+    uint8_t o[3] = {(uint8_t)vueltaVistos[0], (uint8_t)vueltaVistos[1], (uint8_t)vueltaVistos[2]};
+    bool igual = o[0] == ordenPista[0] && o[1] == ordenPista[1] && o[2] == ordenPista[2];
+    if (!igual) guardarOrden(o, "aprendido en la vuelta");
+  }
+}
 
 const char* nombreCarro() {
   switch (carroEstado) {
@@ -1474,6 +1518,8 @@ void carroEvento(const char* ev, int almacen) {
 // ev "qr" + "codigo" (texto leído) + "estacion": 0 = HOME, 1..4 = E1..E4,
 // -1 = QR desconocido. "almacen" solo va con E1..E4 (igual que antes).
 void qrSenal(const char* codigo, int idx) {
+  aprenderOrden(idx);                                     // v9: anota el orden de los QR en la pista
+  if (!carroSim && idx >= 1 && idx <= 3 && carroEnViaje()) carroS = sAlm(idx);   // el dibujo se acomoda donde está ese QR
   StaticJsonDocument<384> d;
   d["tipo"]     = "agv_evento";
   d["ev"]       = "qr";
@@ -1565,6 +1611,7 @@ bool carroSalir(const String& loteIdJson) {
   carroS = 0;
   running = false;
   carroEstado = CARRO_SALIENDO;
+  vueltaN = 0;                             // sale de HOME: empieza una vuelta (para aprender el orden de los QR)
   carroEvento("salio", 0);
   carroIrA(dest);
   Serial.printf("Carro: lote %ld sale hacia el almacen %d\n", carroLoteN, dest);
@@ -1603,7 +1650,7 @@ void carroAlLlegar(int idx) {
     return;
   }
   // almacén: se detiene y descarga con la rampa
-  carroS = CARRO_S_ALM[idx - 1];
+  carroS = sAlm(idx);
   carroEstado = CARRO_DESCARGANDO;
   carroEvento("llegada", idx);        // el evento "qr" ya lo mandó qrSenal()
   iniciarSecuenciaRampa();
@@ -1669,10 +1716,10 @@ void simLeerQR(const char* codigo, int idx, float pos) {
 void simRevisarQR(float antes) {
   for (int i = 0; i < 3; i++) {
     float p = CARRO_S_ALM[i];
-    if (antes < p && carroS >= p) {
+    if (antes < p && carroS >= p) {                      // en el lugar i está el QR del almacén ordenPista[i]
       char cod[8];
-      snprintf(cod, sizeof(cod), "QR-E%d", i + 1);
-      simLeerQR(cod, i + 1, p);
+      snprintf(cod, sizeof(cod), "QR-E%d", ordenPista[i]);
+      simLeerQR(cod, ordenPista[i], p);
       return;
     }
   }
@@ -1706,6 +1753,9 @@ void cargarRed() {
   srvPort = prefs.getUShort("port", 3000);
   if (srvHost.length() == 0 && strlen(SERVIDOR_NUBE) > 0) { srvHost = SERVIDOR_NUBE; srvPort = 443; }
   carroSim = prefs.getBool("sim", false);
+  { uint16_t o = prefs.getUShort("orden", 123);           // v9: orden de los QR guardado
+    uint8_t v[3] = {(uint8_t)(o / 100), (uint8_t)(o / 10 % 10), (uint8_t)(o % 10)};
+    if (ordenValido(v)) for (int i = 0; i < 3; i++) ordenPista[i] = v[i]; }
   prefs.end();
   if (redSsid.length() == 0 && strlen(WIFI_RED) > 0) {   // nada guardado: usa la red escrita en el programa
     redSsid = WIFI_RED;
@@ -1787,6 +1837,11 @@ void procesarServidor(uint8_t* payload, size_t length) {
     else if (strcmp(c, "modoSim") == 0)  cambiarModoSim(doc["on"] | false);
     else if (strcmp(c, "home") == 0)     carroHome();
     else if (strcmp(c, "vaciar") == 0)   carroVaciar();      // botón 🗑 Quitar vasos de la página
+    else if (strcmp(c, "orden") == 0) {                       // v9: orden de los QR escrito a mano (ej. 312)
+      int v = doc["v"] | 0;
+      uint8_t o[3] = {(uint8_t)(v / 100), (uint8_t)(v / 10 % 10), (uint8_t)(v % 10)};
+      guardarOrden(o, "escrito en la pagina");
+    }
     enviarTelemetria();
   } else if (strcmp(tipo, "agv_cmd") == 0) {
     const char* cmd = doc["cmd"] | "";
@@ -1905,6 +1960,8 @@ void enviarTelemetria() {
   JsonArray en = doc.createNestedArray("entregas");
   for (int i = 0; i < 3; i++) en.add(carroEntregas[i]);
   doc["piso"] = carroPiso;
+  JsonArray op = doc.createNestedArray("orden");           // v9: almacén en cada lugar de la pista
+  for (int i = 0; i < 3; i++) op.add(ordenPista[i]);
   if (carroLoteActivo()) {
     JsonObject lo = doc.createNestedObject("lote");
     lo["n"] = carroLoteN;

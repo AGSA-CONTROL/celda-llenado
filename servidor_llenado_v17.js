@@ -230,7 +230,9 @@ const enviar = (ws, o) => { if (ws && ws.readyState === 1) ws.send(JSON.stringif
 const avisarVistas = (S, o) => S.vistas.forEach(v => enviar(v, o));
 const avisarTiendas = S => S.tiendas.forEach(t => enviar(t, { tipo: "hmi", en_linea: !!S.hmi }));
 const avisarHmi = S => enviar(S.hmi, { tipo: "tiendas", n: S.tiendas.size });
-const CTL_VISTA = ["paro", "salir", "modoDest", "vel", "modoSim", "home", "vaciar"];   // lo que una vista puede pedirle al carro
+/* orden de los QR en la pista: [almacén en el 1er lugar, 2º, 3º] (ej. [3,1,2]) */
+const ordenOk = o => Array.isArray(o) && o.length === 3 && [1, 2, 3].every(n => o.map(Number).includes(n));
+const CTL_VISTA = ["paro", "salir", "modoDest", "vel", "modoSim", "home", "vaciar", "orden"];   // lo que una vista puede pedirle al carro
 const AGV_A_HMI = ["agv_estado", "agv_evento"];     // la página del AGV solo puede mandar esto al HMI
 const idValido = id => typeof id === "string" && /^[\w-]{1,40}$/.test(id);
 const LOCALES = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
@@ -425,7 +427,8 @@ wss.on("connection", (ws, req) => {
     if (m.tipo === "agv_pos") {
       const vale = (ws.rol === "agv" && ws === S.agv && S.agvPaginas.includes(ws)) || (ws.rol === "agv_vista" && S.agvEsp && S.agv === S.agvEsp);
       if (!vale) return;
-      const o = { tipo: "agv_pos", p: Math.max(0, Math.min(4, Number(m.p) || 0)), estado: String(m.estado || "").slice(0, 20), destino: Math.max(0, Math.min(3, Number(m.destino) | 0)), descargando: !!m.descargando };
+      const o = { tipo: "agv_pos", p: Math.max(0, Math.min(4, Number(m.p) || 0)), estado: String(m.estado || "").slice(0, 20), destino: Math.max(0, Math.min(3, Number(m.destino) | 0)), descargando: !!m.descargando,
+                  orden: ordenOk(m.orden) ? m.orden.map(Number) : [1, 2, 3] };
       S.tiendas.forEach(t => enviar(t, o));
       return;
     }

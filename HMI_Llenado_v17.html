@@ -3334,8 +3334,13 @@ const AGV = (() => {
     }
     return r;
   }
+  /* v17: los QR de los almacenes pueden estar revueltos en la pista; el carro manda en qué orden están */
+  let ordenDib = [1, 2, 3];
   function dibujar(){
-    const svg = $("#agvSvg"); if(!svg || svgListo) return;
+    const svg = $("#agvSvg"); if(!svg) return;
+    const ord = Array.isArray(st.orden) && st.orden.length === 3 && [1, 2, 3].every(n => st.orden.includes(n)) ? st.orden : [1, 2, 3];
+    if(svgListo && ord.join() === ordenDib.join()) return;
+    ordenDib = ord.slice();
     const alm = (n, x, y, w, h, tx, ty) =>
       `<g class="alm" id="agvAlm${n}"><rect class="edif" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
         <path d="M${x} ${y+16}h${w}" stroke="#3b4659" stroke-width="2"/>
@@ -3365,9 +3370,7 @@ const AGV = (() => {
       <g class="parada"><line x1="650" y1="448" x2="650" y2="492"/></g>
       <g class="parada"><line x1="828" y1="290" x2="872" y2="290"/></g>
       <g class="parada"><line x1="560" y1="88" x2="560" y2="132"/></g>
-      ${alm(1, 590, 500, 120, 70, 790, 530)}
-      ${alm(2, 885, 225, 105, 130, 937, 375)}
-      ${alm(3, 500, 8, 120, 62, 690, 36)}
+      ${[[590, 500, 120, 70, 790, 530], [885, 225, 105, 130, 937, 375], [500, 8, 120, 62, 690, 36]].map((g, i) => alm(ordenDib[i], ...g)).join("")}
       <g id="agvCarro">
         <rect x="-30" y="-22" width="60" height="44" rx="9" fill="#2b3442" stroke="#c9d1db" stroke-width="2"/>
         <rect x="-24" y="-27" width="16" height="7" rx="2" fill="#0d1117"/><rect x="8" y="-27" width="16" height="7" rx="2" fill="#0d1117"/>
@@ -3452,7 +3455,7 @@ const AGV = (() => {
     if(m.tipo === "agv_estado"){
       const antes = enCarga();
       st.online = true;
-      ["estado", "s", "lado", "vasos", "lote", "pausado", "entregas", "piso", "modo", "puerto", "linea"].forEach(k => { if(k in m) st[k] = m[k]; });
+      ["estado", "s", "lado", "vasos", "lote", "pausado", "entregas", "piso", "modo", "puerto", "linea", "orden"].forEach(k => { if(k in m) st[k] = m[k]; });
       if(visible("#viewAGV")) render(); else chip();
       avisarDisponibilidad();
       if(!antes && enCarga()){ renderTodo(); if(window.DISP) DISP.pump(); }

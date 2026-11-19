@@ -752,7 +752,25 @@ function prepararRuta() {
     for (let s = 0; s <= RUTA.L; s += 2) { const q = p.getPointAtLength(s), d = (q.x - x) ** 2 + (q.y - y) ** 2; if (d < d0) { d0 = d; mejor = s; } }
     RUTA.paradas[k] = mejor;
   });
-  RUTA.paradas.carga = 0; dibujarCarroT();
+  RUTA.paradas.carga = 0;
+  RUTA.lugares = [RUTA.paradas.a1, RUTA.paradas.a2, RUTA.paradas.a3];   // los 3 lugares de la pista, en orden desde carga
+  aplicarOrden(); dibujarCarroT();
+}
+/* v17: los QR de los almacenes pueden estar revueltos en la pista. ORDEN_T[i] = almacén en el lugar i+1.
+   Los letreros de los almacenes y sus paradas se acomodan según el orden que manda el carro. */
+let ORDEN_T = [1, 2, 3];
+const LUGAR_T = [[160, 356], [312, 170], [143, 14]];        // esquina del letrero de cada lugar (como estaba: Almacén 1, 2, 3)
+function aplicarOrden() {
+  ORDEN_T.forEach((n, i) => {
+    const g = $("almT" + n); if (!g) return;
+    const dx = LUGAR_T[i][0] - LUGAR_T[n - 1][0], dy = LUGAR_T[i][1] - LUGAR_T[n - 1][1];
+    g.setAttribute("transform", dx || dy ? `translate(${dx} ${dy})` : "");
+    if (RUTA.lugares) RUTA.paradas["a" + n] = RUTA.lugares[i];
+  });
+}
+function ponerOrdenT(o) {
+  if (!(Array.isArray(o) && o.length === 3 && [1, 2, 3].every(n => o.includes(n))) || o.join() === ORDEN_T.join()) return;
+  ORDEN_T = o.slice(); aplicarOrden();
 }
 function dibujarCarroT() {
   const p = $("rutaLinea"), s = RUTA.s % RUTA.L, a = p.getPointAtLength(s), b = p.getPointAtLength((s + 2) % RUTA.L);
@@ -763,7 +781,7 @@ function dibujarCarroT() {
    Cuando llegan posiciones del carro, el carrito de aquí va EXACTO donde va el carro; si no llegan, se anima solo. */
 const SYNC = { t: 0, objetivo: 0, anim: null };
 function sAvance(p) {
-  const T = [0, RUTA.paradas.a1, RUTA.paradas.a2, RUTA.paradas.a3, RUTA.L];
+  const T = [0, ...(RUTA.lugares || [RUTA.paradas.a1, RUTA.paradas.a2, RUTA.paradas.a3]), RUTA.L];   // p va por lugar de la pista
   const i = Math.min(3, Math.floor(p)), f = p - i;
   return T[i] + (T[i + 1] - T[i]) * f;
 }
@@ -944,7 +962,7 @@ function recibir(m) {
     return;
   }
   if (m.tipo === "hmi") { hmiOn = !!m.en_linea; if (!hmiOn) disp = { pedir: true, msg: "", agv: "" }; etiqueta(); pintar(); return; }
-  if (m.tipo === "agv_pos") { posCarro(m); return; }
+  if (m.tipo === "agv_pos") { if (m.orden) ponerOrdenT(m.orden.map(Number)); posCarro(m); return; }
   if (m.tipo === "disponibilidad") { disp = { pedir: !!m.pedir, msg: m.msg || "", agv: m.agv || "" }; actualizarDisp(); return; }
   if (m.tipo !== "estado" || !pedido || (m.id && m.id !== pedido.id)) return;
   const i = Math.min(2, Math.max(0, (m.vaso || 1) - 1)), g = GRANOS[(m.grano || 1) - 1];
