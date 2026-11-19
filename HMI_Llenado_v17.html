@@ -786,6 +786,7 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
 #agvSvg .alm rect.edif{fill:#1d2530;stroke:#3b4659;stroke-width:2}
 #agvSvg .alm.dest rect.edif{stroke:var(--yellow);stroke-width:3}
 #agvSvg .alm.dest .tit{fill:var(--yellow)}
+#agvSvg .alm.oculto{display:none}   /* v17: solo se ve el almacén al que se manda */
 #agvSvg .alm .tit{fill:var(--text);font:700 16px system-ui,sans-serif}
 #agvSvg .alm .num{fill:var(--muted);font:600 12px var(--mono)}
 #agvSvg .parada line{stroke:#c9d1db;stroke-width:3}
@@ -3334,13 +3335,12 @@ const AGV = (() => {
     }
     return r;
   }
-  /* v17: los QR de los almacenes pueden estar revueltos en la pista; el carro manda en qué orden están */
-  let ordenDib = [1, 2, 3];
+  /* v17: los maestros ponen los QR de los almacenes donde quieran: no hay orden.
+     El dibujo muestra UN solo almacén (el del lote) en el lugar del medio de la pista. */
+  let almVis = 1;
   function dibujar(){
     const svg = $("#agvSvg"); if(!svg) return;
-    const ord = Array.isArray(st.orden) && st.orden.length === 3 && [1, 2, 3].every(n => st.orden.includes(n)) ? st.orden : [1, 2, 3];
-    if(svgListo && ord.join() === ordenDib.join()) return;
-    ordenDib = ord.slice();
+    if(svgListo) return;
     const alm = (n, x, y, w, h, tx, ty) =>
       `<g class="alm" id="agvAlm${n}"><rect class="edif" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>
         <path d="M${x} ${y+16}h${w}" stroke="#3b4659" stroke-width="2"/>
@@ -3367,10 +3367,8 @@ const AGV = (() => {
       <g class="parada"><line x1="400" y1="448" x2="400" y2="492"/></g>
       <g transform="translate(375 500)"><rect width="50" height="50" fill="#fff" rx="3"/><svg x="3" y="3" width="44" height="44" viewBox="0 0 25 25" id="agvQrPiso"></svg></g>
       <text x="400" y="568" text-anchor="middle" fill="#98a3b3" font-size="13" font-family="system-ui,sans-serif">Lector QR</text>
-      <g class="parada"><line x1="650" y1="448" x2="650" y2="492"/></g>
       <g class="parada"><line x1="828" y1="290" x2="872" y2="290"/></g>
-      <g class="parada"><line x1="560" y1="88" x2="560" y2="132"/></g>
-      ${[[590, 500, 120, 70, 790, 530], [885, 225, 105, 130, 937, 375], [500, 8, 120, 62, 690, 36]].map((g, i) => alm(ordenDib[i], ...g)).join("")}
+      ${[1, 2, 3].map(n => alm(n, 885, 225, 105, 130, 937, 375)).join("")}
       <g id="agvCarro">
         <rect x="-30" y="-22" width="60" height="44" rx="9" fill="#2b3442" stroke="#c9d1db" stroke-width="2"/>
         <rect x="-24" y="-27" width="16" height="7" rx="2" fill="#0d1117"/><rect x="8" y="-27" width="16" height="7" rx="2" fill="#0d1117"/>
@@ -3413,8 +3411,10 @@ const AGV = (() => {
     $("#agvDestSub").textContent = !st.lote ? "El destino se lee en el QR al salir de carga." : leido ? `QR leído · lote ${st.lote.n}` : "Se leerá en el lector QR del circuito.";
     const q = qrSvg(st.lote ? `LOTE-${st.lote.n}|ALM-${st.lote.destino}` : "LA-COSECHA-AGV");
     $("#agvQr").innerHTML = st.lote ? q : ""; if(svgListo) $("#agvQrPiso").innerHTML = q;
+    if(st.lote && st.lote.destino >= 1 && st.lote.destino <= 3) almVis = Number(st.lote.destino);
     for(let n = 1; n <= 3; n++){
       if(!svgListo) break;
+      $("#agvAlm" + n).classList.toggle("oculto", n !== almVis);
       $("#agvAlm" + n).classList.toggle("dest", !!(leido && st.lote.destino === n));
       $("#agvAlmN" + n).textContent = `${st.entregas[n - 1]} lote${st.entregas[n - 1] === 1 ? "" : "s"}`;
       $("#agvC" + n).textContent = st.entregas[n - 1];
@@ -3455,7 +3455,7 @@ const AGV = (() => {
     if(m.tipo === "agv_estado"){
       const antes = enCarga();
       st.online = true;
-      ["estado", "s", "lado", "vasos", "lote", "pausado", "entregas", "piso", "modo", "puerto", "linea", "orden"].forEach(k => { if(k in m) st[k] = m[k]; });
+      ["estado", "s", "lado", "vasos", "lote", "pausado", "entregas", "piso", "modo", "puerto", "linea"].forEach(k => { if(k in m) st[k] = m[k]; });
       if(visible("#viewAGV")) render(); else chip();
       avisarDisponibilidad();
       if(!antes && enCarga()){ renderTodo(); if(window.DISP) DISP.pump(); }

@@ -267,6 +267,7 @@ body{font-size:clamp(15px,min(1.3vw,2.3vh),30px)}
 #ruta .almT.ok rect{fill:#2c5b49;stroke:#6cc08b;stroke-width:5}
 #ruta .almT .chk{opacity:0;transition:opacity .3s}
 #ruta .almT.ok .chk{opacity:1}
+#ruta .almT.oculto{display:none}   /* v17: solo se ve el almacén al que va el pedido */
 #ruta .lbl{fill:#b9cbbf;font:700 15px var(--f)}
 
 /* la columna de seguimiento siempre cabe en la pantalla */
@@ -753,24 +754,18 @@ function prepararRuta() {
     RUTA.paradas[k] = mejor;
   });
   RUTA.paradas.carga = 0;
-  RUTA.lugares = [RUTA.paradas.a1, RUTA.paradas.a2, RUTA.paradas.a3];   // los 3 lugares de la pista, en orden desde carga
-  aplicarOrden(); dibujarCarroT();
+  RUTA.paradas.a1 = RUTA.paradas.a3 = RUTA.paradas.a2;              // un solo almacén (el del pedido) en el medio
+  dibujarCarroT();
 }
-/* v17: los QR de los almacenes pueden estar revueltos en la pista. ORDEN_T[i] = almacén en el lugar i+1.
-   Los letreros de los almacenes y sus paradas se acomodan según el orden que manda el carro. */
-let ORDEN_T = [1, 2, 3];
-const LUGAR_T = [[160, 356], [312, 170], [143, 14]];        // esquina del letrero de cada lugar (como estaba: Almacén 1, 2, 3)
-function aplicarOrden() {
-  ORDEN_T.forEach((n, i) => {
-    const g = $("almT" + n); if (!g) return;
-    const dx = LUGAR_T[i][0] - LUGAR_T[n - 1][0], dy = LUGAR_T[i][1] - LUGAR_T[n - 1][1];
+/* v17: los maestros ponen los QR de los almacenes donde quieran: no hay orden.
+   Se dibuja UN solo almacén (el que eligió la tienda), en el lugar del medio de la pista. */
+const LUGAR_T = [[160, 356], [312, 170], [143, 14]];        // esquina del letrero de Almacén 1, 2, 3 en el dibujo
+function juntarAlmacenes() {
+  for (let n = 1; n <= 3; n++) {
+    const g = $("almT" + n); if (!g) continue;
+    const dx = LUGAR_T[1][0] - LUGAR_T[n - 1][0], dy = LUGAR_T[1][1] - LUGAR_T[n - 1][1];
     g.setAttribute("transform", dx || dy ? `translate(${dx} ${dy})` : "");
-    if (RUTA.lugares) RUTA.paradas["a" + n] = RUTA.lugares[i];
-  });
-}
-function ponerOrdenT(o) {
-  if (!(Array.isArray(o) && o.length === 3 && [1, 2, 3].every(n => o.includes(n))) || o.join() === ORDEN_T.join()) return;
-  ORDEN_T = o.slice(); aplicarOrden();
+  }
 }
 function dibujarCarroT() {
   const p = $("rutaLinea"), s = RUTA.s % RUTA.L, a = p.getPointAtLength(s), b = p.getPointAtLength((s + 2) % RUTA.L);
@@ -781,7 +776,7 @@ function dibujarCarroT() {
    Cuando llegan posiciones del carro, el carrito de aquí va EXACTO donde va el carro; si no llegan, se anima solo. */
 const SYNC = { t: 0, objetivo: 0, anim: null };
 function sAvance(p) {
-  const T = [0, ...(RUTA.lugares || [RUTA.paradas.a1, RUTA.paradas.a2, RUTA.paradas.a3]), RUTA.L];   // p va por lugar de la pista
+  const a = RUTA.paradas.a2, T = [0, a / 2, a, (a + RUTA.L) / 2, RUTA.L];   // p: 0 = carga, 2 = almacén, 4 = carga otra vez
   const i = Math.min(3, Math.floor(p)), f = p - i;
   return T[i] + (T[i + 1] - T[i]) * f;
 }
@@ -817,8 +812,12 @@ function rutaIr(k) {                       // avanza siguiendo la línea (solo h
   };
   RUTA.anim = requestAnimationFrame(paso);
 }
+let almVisT = 1;
 function rutaDestino(d, ok) {
+  if (d >= 1 && d <= 3) almVisT = d;
+  juntarAlmacenes();
   for (let n = 1; n <= 3; n++) {
+    $("almT" + n).classList.toggle("oculto", n !== almVisT);
     $("almT" + n).classList.toggle("dest", n === d && !ok);
     $("almT" + n).classList.toggle("ok", n === d && !!ok);
   }
@@ -827,6 +826,7 @@ function mostrarRuta(on) {
   $("rueda").toggleAttribute("hidden", on); $("ruta").toggleAttribute("hidden", !on);   // en SVG se usa el atributo
   if (!on) { if (RUTA.anim) cancelAnimationFrame(RUTA.anim); RUTA.anim = null; RUTA.s = 0; RUTA.meta = 0; rutaDestino(0); }
   if (on && !RUTA.L) prepararRuta();
+  if (on && pedido && pedido.almacen) rutaDestino(pedido.almacen);
   if (on) dibujarCarroT();
 }
 
@@ -962,7 +962,7 @@ function recibir(m) {
     return;
   }
   if (m.tipo === "hmi") { hmiOn = !!m.en_linea; if (!hmiOn) disp = { pedir: true, msg: "", agv: "" }; etiqueta(); pintar(); return; }
-  if (m.tipo === "agv_pos") { if (m.orden) ponerOrdenT(m.orden.map(Number)); posCarro(m); return; }
+  if (m.tipo === "agv_pos") { posCarro(m); return; }
   if (m.tipo === "disponibilidad") { disp = { pedir: !!m.pedir, msg: m.msg || "", agv: m.agv || "" }; actualizarDisp(); return; }
   if (m.tipo !== "estado" || !pedido || (m.id && m.id !== pedido.id)) return;
   const i = Math.min(2, Math.max(0, (m.vaso || 1) - 1)), g = GRANOS[(m.grano || 1) - 1];

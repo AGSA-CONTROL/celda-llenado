@@ -129,6 +129,7 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 #svg .qrE text{fill:#98a3b3;font:700 11px var(--mono)}
 #svg .qrE.leido rect.fondo{fill:#f5a623}
 #svg .qrE.leido text{fill:#f5a623}
+#svg .alm.oculto,#svg .qrE.oculto{display:none}   /* v17: solo se ve el almacén al que se manda */
 .destBtns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .ordenFila{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-weight:700;font-size:14px}
 .ordenFila select{padding:6px 8px;font-weight:700}
@@ -320,14 +321,7 @@ pre.proto{max-height:none}
         <div class="row"><button class="btnAvanzar" id="btnEnviar" type="button">▶ AVANZAR</button><button class="paro btnParo2" id="btnParo2" type="button">⛔ PARO</button></div>
         <p class="nota notaCtl" id="notaCtl"></p>
         <div class="fld velFld"><label for="vel">Velocidad del carro <b id="velTxt">60 %</b></label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
-        <p class="nota" id="destNota">QR-HOME = estación de carga · QR-E1, E2 y E3 = almacenes. El carro se detiene en cada QR y solo descarga en el almacén elegido.</p>
-        <div class="paso" style="margin-top:12px"><span class="pnum">⇄</span>Orden de los QR en la pista</div>
-        <div class="ordenFila">HOME →
-          <select id="ord0" aria-label="Primer QR después de HOME"><option value="1">E1</option><option value="2">E2</option><option value="3">E3</option></select> →
-          <select id="ord1" aria-label="Segundo QR"><option value="1">E1</option><option value="2">E2</option><option value="3">E3</option></select> →
-          <select id="ord2" aria-label="Tercer QR"><option value="1">E1</option><option value="2">E2</option><option value="3">E3</option></select> → HOME
-          <button type="button" class="btnOrden" id="btnOrden">Guardar orden</button></div>
-        <p class="nota" id="ordenNota">Los QR de los almacenes pueden ir en cualquier lugar de la pista (HOME siempre en carga). El carro busca el código del almacén elegido, no cuenta estaciones. El carro físico aprende solo el orden en su primera vuelta; aquí también lo puedes poner a mano.</p>
+        <p class="nota" id="destNota">QR-HOME = estación de carga · QR-E1, E2 y E3 = almacenes. Los maestros ponen los QR de los almacenes donde quieran: el carro busca el QR del almacén elegido y ahí descarga (si pasa por otro QR, se para un momento y sigue). El dibujo solo muestra el almacén al que se manda.</p>
       </section>
       <section class="grp permCard" id="permCard">
         <div class="cardHead"><h3>Carro físico en esta sala</h3><span class="pill" id="permPill">—</span></div>
@@ -467,16 +461,17 @@ const TXT = {
 };
 const st = { estado:"CARGA", s:0, lado:0, fase:0, t:0, vasos:[], lote:null, pausado:false,
              entregas:[0,0,0], piso:0, n:0, sigRot:1, linea:"" };
-let ruta = null, L = 0, S = {}, SP = [0, 0, 0];   // SP = posición de los 3 lugares de la pista (en orden desde HOME)
-/* v17: los QR de los almacenes pueden estar revueltos. ORDEN[i] = almacén que está en el lugar i+1 de la pista */
-const ORDEN_KEY = "agv_orden_pista";
-const ordenOk = o => Array.isArray(o) && o.length === 3 && [1, 2, 3].every(n => o.map(Number).includes(n));
-let ORDEN = [1, 2, 3];
-try{ const o = JSON.parse(localStorage.getItem(ORDEN_KEY) || "null"); if(ordenOk(o)) ORDEN = o.map(Number); }catch(_){}
-const ordenTxt = o => "HOME → " + o.map(n => "E" + n).join(" → ") + " → HOME";
-/* lugares fijos del dibujo: cuadrito QR, raya de la parada y edificio (el almacén que va ahí depende de ORDEN) */
-const LUGAR_QR  = [[628, 398, 650, 392, "middle"], [778, 268, 750, 294, "end"], [538, 140, 560, 198, "middle"]];
-const LUGAR_ALM = [[590, 500, 120, 70, 800, 531], [885, 225, 105, 130, 920, 390], [500, 8, 120, 62, 710, 37]];
+let ruta = null, L = 0, S = {};
+/* v17: los maestros ponen los QR de los almacenes donde quieran (y los cambian en ese momento).
+   No hay orden: el dibujo muestra UN solo almacén (el que se va a mandar) en el lugar del medio de la pista. */
+const LUGAR_QR  = [778, 268, 750, 294, "end"];
+const LUGAR_ALM = [885, 225, 105, 130, 920, 390];
+let ALM_VIS = 1;                                        // almacén que se ve en el dibujo
+function almVisto(){
+  const n = st.lote ? Number(st.lote.destino) : proximoDestino();
+  if(n >= 1 && n <= 3) ALM_VIS = n;
+  return ALM_VIS;
+}
 
 function qrSvg(texto){
   let h = 2166136261; for(const ch of texto){ h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
@@ -532,11 +527,9 @@ function dibujar(){
     <g class="parada"><line x1="258" y1="330" x2="302" y2="330"/><text x="312" y="335" fill="#33c469" font-size="15" font-weight="700" font-family="system-ui,sans-serif">CARGA</text></g>
     <svg id="qrPiso" width="0" height="0"></svg>
     ${qrEst("HOME", 204, 284, 226, 342)}
-    ${LUGAR_QR.map((g, i) => qrEst("E" + ORDEN[i], ...g)).join("")}
-    <g class="parada"><line x1="650" y1="448" x2="650" y2="492"/></g>
+    ${[1, 2, 3].map(n => qrEst("E" + n, ...LUGAR_QR)).join("")}
     <g class="parada"><line x1="828" y1="290" x2="872" y2="290"/></g>
-    <g class="parada"><line x1="560" y1="88" x2="560" y2="132"/></g>
-    ${LUGAR_ALM.map((g, i) => alm(ORDEN[i], ...g)).join("")}
+    ${[1, 2, 3].map(n => alm(n, ...LUGAR_ALM)).join("")}
     <g id="vuelos"></g>
     <g id="carro">
       <rect x="-30" y="-22" width="60" height="44" rx="9" fill="#2b3442" stroke="#c9d1db" stroke-width="2"/>
@@ -554,8 +547,7 @@ function dibujar(){
     S[k] = mejor;
   });
   if(S.carga > L / 2) S.carga = 0;
-  SP = [S.a1, S.a2, S.a3];                                  // lugares 1, 2 y 3 de la pista
-  ORDEN.forEach((n, i) => { S["a" + n] = SP[i]; });         // posición de cada almacén según el orden de sus QR
+  S.a1 = S.a3 = S.a2;                                       // un solo lugar de almacén (el del medio)
   if(!dibujar.hecho){ st.s = S.carga; dibujar.hecho = true; }
   pintarAlmacenes();
 }
@@ -708,7 +700,7 @@ function irHome(){
 function leerQr(n){ if(st.lote) st.lote.destino = n; log(`🔳 QR leído: Almacén ${n}.`); st.estado = "A_ALMACEN"; evento("qr"); }
 /* v17: paradas del circuito en orden (cada almacén tiene su QR; HOME al final de la vuelta) */
 function siguienteParada(){
-  const lista = [1, 2, 3].map(n => ({ n, s:S["a" + n] })).concat([{ n:0, s:L + S.carga }]).sort((a, b) => a.s - b.s);
+  const lista = [{ n:almVisto(), s:S.a2 }, { n:0, s:L + S.carga }];   // el QR del almacén del lote y luego HOME
   return lista.find(p => p.s > st.s + 0.5) || lista[lista.length - 1];
 }
 function leerQrEstacion(n){
@@ -793,7 +785,6 @@ function delCarro(m){                                   // agv_estado del ESP32 
   ESP.tel = m; ESP.online = true;
   st.estado = m.estado || "CARGA"; st.pausado = !!m.pausado; st.vasos = m.vasos || [];
   st.lote = m.lote || null; st.entregas = m.entregas || [0, 0, 0]; st.piso = m.piso || 0; st.linea = m.linea || "";
-  if(ordenOk(m.orden)) ponerOrden(m.orden.map(Number), false);   // el carro físico aprende el orden de los QR
   let s = Number(m.s) || 0;
   if(st.estado === "REGRESANDO" && s < ESP.sTel - L / 2) s += L;
   ESP.movia = Math.abs(s - ESP.sTel) > 0.5; ESP.sTel = s; ESP.tTel = performance.now();
@@ -917,11 +908,11 @@ function deCarrosSala(m){
 }
 
 /* ===== Posición del carro para la TIENDA (su carrito va igual que este) =====
-   p = avance en la vuelta: 0 = carga, 1 = Almacén 1, 2 = Almacén 2, 3 = Almacén 3, 4 = de nuevo en carga */
+   p = avance en la vuelta: 0 = carga, 2 = en el almacén (el del lote), 4 = de nuevo en carga */
 let ultPos = { p:-1, t:0, e:"" };
 function avanceVuelta(){
   if(!L) return 0;
-  const P = [S.carga, SP[0], SP[1], SP[2], L + S.carga];   // por lugar de la pista (la tienda usa el mismo orden)
+  const P = [S.carga, (S.carga + S.a2) / 2, S.a2, (S.a2 + L + S.carga) / 2, L + S.carga];   // 2 = el almacén (la tienda usa lo mismo)
   let x = st.s; if(x < S.carga - 0.5) x += L;
   if(st.estado === "CARGA") return 0;
   for(let i = 0; i < 4; i++) if(x <= P[i + 1]) return i + Math.max(0, Math.min(1, (x - P[i]) / ((P[i + 1] - P[i]) || 1)));
@@ -933,7 +924,7 @@ function publicarPos(){
   const p = Math.round(avanceVuelta() * 1000) / 1000, now = Date.now(), e = st.estado || "";
   if(Math.abs(p - ultPos.p) < 0.002 && e === ultPos.e && now - ultPos.t < 2000) return;
   ultPos = { p, t:now, e };
-  mandar({ tipo:"agv_pos", p, estado:e, destino: st.lote ? st.lote.destino : 0, descargando: e === "DESCARGANDO", orden:ORDEN });
+  mandar({ tipo:"agv_pos", p, estado:e, destino: st.lote ? st.lote.destino : 0, descargando: e === "DESCARGANDO" });
 }
 pulsoFiable(publicarPos, 150);
 function deHmi(m){
@@ -971,7 +962,7 @@ function publicar(forzar){
   const estadoPub = st.estado === "EN_ESTACION" ? (st.prev === "REGRESANDO" ? "REGRESANDO" : "SALIENDO") : st.estado === "A_ALMACEN" ? "SALIENDO" : st.estado;
   mandar({ tipo:"agv_estado", estado:estadoPub, s:Math.round(st.s * 10) / 10, lado:Math.round(st.lado * 10) / 10,
            vasos:st.vasos, lote:loteInfo(), pausado:st.pausado, entregas:st.entregas, piso:st.piso,
-           modo:"sim", puerto:true, linea:sensores(), orden:ORDEN });
+           modo:"sim", puerto:true, linea:sensores() });
 }
 
 /* =====================================================================
@@ -995,7 +986,10 @@ function render(){
   const dq = st.lote ? st.lote.destino : prox;
   $("#qr").innerHTML = dq ? qrSvg("QR-E" + dq) : "";
   $("#qr").style.display = dq ? "" : "none";
+  const vis = almVisto();
   for(let n = 1; n <= 3; n++){
+    $("#alm" + n).classList.toggle("oculto", n !== vis);
+    $("#qrEE" + n).classList.toggle("oculto", n !== vis);
     $("#alm" + n).classList.toggle("dest", !!(leido && st.lote.destino === n));
     $("#alm" + n).classList.toggle("prox", !st.lote && prox === n);
     const nv = STOCK[n].reduce((a, b) => a + b, 0);
@@ -1049,34 +1043,9 @@ function render(){
   $("#pie").textContent = `● ${MODO_SIM ? "MODO SIMULADOR" : "CARRO REAL (ESP32) · " + (ESP.online ? "en línea" : "sin conexión")} · ${SRV.abierto ? "servidor conectado" : "sin servidor"} · ${SRV.hmi ? "HMI en línea" : "HMI sin conexión"} · ${(TXT[st.estado] || [""])[0].toLowerCase()}`;
 }
 
-/* ---------- orden de los QR en la pista ---------- */
-function pintarOrdenSel(){ ORDEN.forEach((n, i) => { const e = $("#ord" + i); if(e && document.activeElement !== e) e.value = String(n); }); }
-function ponerOrden(o, guardar){
-  const cambio = o.join() !== ORDEN.join();
-  ORDEN = o.slice();
-  if(guardar){ try{ localStorage.setItem(ORDEN_KEY, JSON.stringify(ORDEN)); }catch(_){} }
-  if(cambio){
-    const sv = st.s; dibujar(); st.s = sv;
-    pintarAlmacenes();
-    log(`⇄ Orden de los QR en la pista: ${ordenTxt(ORDEN)}.`);
-    render();
-  }
-  pintarOrdenSel();
-}
-$("#btnOrden").addEventListener("click", () => {
-  const o = [0, 1, 2].map(i => Number($("#ord" + i).value));
-  if(!ordenOk(o)){ toast("Cada almacén debe aparecer una sola vez (E1, E2 y E3)."); pintarOrdenSel(); return; }
-  if(MODO_SIM){
-    if(st.estado !== "CARGA"){ toast("Cambia el orden cuando el carro esté en carga."); pintarOrdenSel(); return; }
-    ponerOrden(o, true); toast("Orden guardado: " + ordenTxt(o)); return;
-  }
-  ctl("orden", { v: o[0] * 100 + o[1] * 10 + o[2] });
-  ponerOrden(o, true); log(`⇄ Orden enviado al carro: ${ordenTxt(o)}.`); toast("Orden enviado al carro: " + ordenTxt(o));
-});
-
 /* ---------- arranque ---------- */
 (function iniciar(){
-  dibujar(); pintarOrdenSel();
+  dibujar();
   document.title = MODO_SIM ? "AGV-01 · SIMULADOR" : "AGV-01 · Carro real";
   $("#cardEsp").hidden = MODO_SIM; $("#cardPasos").hidden = MODO_SIM;
   $("#marcaSub").textContent = MODO_SIM ? "SIMULADOR" : "CARRO DE ENTREGA";
