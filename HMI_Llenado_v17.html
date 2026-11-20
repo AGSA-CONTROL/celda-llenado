@@ -3247,6 +3247,7 @@ function onActResp(l){
     case "ya_retraido":  actPosicion("ret"); actTexto(); actAviso("Ya estaba retraído: no se movió."); return true;
     case "ya_extendido": actPosicion("ext"); actTexto(); actAviso("Ya estaba extendido: no se movió."); return true;
     case "ocupado":      actAviso("✖ El actuador se está moviendo: espera a que termine.", true); return true;
+    case "auto":         return true;                     // ACT,auto,<tapa>,<qué hizo> (se ve en el registro de la rueda)
   }
   return false;
 }
@@ -3515,7 +3516,7 @@ const AGV = (() => {
     avisarRueda(forzar);
     if(!window.DISP) return;
     const dispOk = !DISP.listo || DISP.listo();
-    const ok = dispOk && (!st.usar || enCarga());
+    const ok = dispOk;                                     // v17: con el carro fuera también se puede pedir: se forma en la fila
     const msg = ok ? "" : !dispOk ? "El dispensador no está listo en este momento (se está conectando o está en paro). Intenta en un momento."
       : !st.online ? "El carro de entrega no está disponible en este momento."
       : st.estado === "REGRESANDO" ? "El carro regresa a la posición de carga. En cuanto llegue podrás hacer tu pedido."
@@ -4125,7 +4126,8 @@ const resumenLote = (p) => p.map((n, i) => n ? `${cal.granos[i]} ×${n}` : null)
 function encolarPedido() {
   if (LV.activo) { alert("Hay un lote en curso. Espera a que se complete (con sus reposiciones) antes de agregar otro."); return; }
   const p = porcionesPedido();
-  if (p.reduce((a, b) => a + b, 0) !== LOTE) { alert(`El lote son ${LOTE} unidades: elige ${LOTE} en total.`); return; }
+  const tot = p.reduce((a, b) => a + b, 0);
+  if (tot < 1 || tot > LOTE) { alert(`El lote es de 1 a ${LOTE} unidades.`); return; }
   cola.push(p.slice());
   pedido.fill(0);
   if ("Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => {});
@@ -4323,7 +4325,7 @@ function procesar(msg) {
       st.dispensando = st.enParo = st.armado = st.espera = false;
       st.loteArmado = null; st.pedidosHechos = 0; st.porcion.fill("");
       log("Lote completado.");
-      if (!cola.length && !st.vaso) avisar(`✔ Lote terminado. Registra otro lote de ${LOTE}.`);
+      if (!cola.length && !st.vaso) avisar(`✔ Lote terminado. Registra otro lote (1 a ${LOTE}).`);
       break;
     case "QUITAR_VASO":
       avisar(cola.length
@@ -4509,8 +4511,8 @@ function render() {
   $("contLote").textContent = `${suma} / ${LOTE}`;
   [...$("segLote").children].forEach((d, k) => d.classList.toggle("on", k < suma));
   const lv = LV.activo;
-  $("btnEncolar").disabled = suma !== LOTE || !!lv;
-  $("btnEncolar").textContent = lv ? "⏳ LOTE EN CURSO: ESPERA A QUE SE COMPLETE" : "➤ AGREGAR LOTE A LA COLA";
+  $("btnEncolar").disabled = suma < 1;                  // v17: lote de 1, 2 o 3; si hay uno en curso, espera en la fila
+  $("btnEncolar").textContent = lv ? "➤ AGREGAR A LA FILA (empieza al terminar el lote en curso)" : "➤ AGREGAR LOTE A LA COLA";
   $("btnFinLote").disabled = !lv;
   if (lv) $("cajaArmado").textContent = (st.armado ? $("cajaArmado").textContent + "\n" : "") + estadoLV(lv);
   if (window.AGV && !window.AGV.puedeCargar()) $("cajaArmado").textContent += "\n🚚 El carro AGV no está en la posición de carga (o su página no está abierta): el siguiente lote empieza cuando esté listo.";
@@ -4602,12 +4604,13 @@ iniciar();
 
   function recibirPedido(m) {
     const p = Array.isArray(m.p) ? m.p : null;
-    if (typeof m.id !== "string" || !p || p.length !== N || !p.every((x) => Number.isInteger(x) && x >= 0) || p.reduce((a, b) => a + b, 0) !== LOTE)
+    const tot = p ? p.reduce((a, b) => a + b, 0) : 0;
+    if (typeof m.id !== "string" || !p || p.length !== N || !p.every((x) => Number.isInteger(x) && x >= 0) || tot < 1 || tot > LOTE)
       return estado(m.id, "error", { msg: "Pedido no válido." });
     if (cola.some((l) => l.id === m.id) || (actual && actual.id === m.id)) return;
     if (!link || !st.listo || st.emergencia) return estado(m.id, "error", { msg: "El dispensador no está listo en este momento." });
     if (typeof CTL !== "undefined" && !CTL.gin.conectado) return estado(m.id, "error", { msg: "La rueda de Ginebra no está conectada en este momento. Avisa al encargado." });
-    if (window.AGV && !window.AGV.puedeCargar()) return estado(m.id, "error", { msg: "El carro está entregando otro pedido. Intenta cuando regrese a la posición de carga." });
+    /* v17: si el carro está entregando o hay un lote en curso, el pedido se forma en la fila y empieza solo */
     if (cola.length >= MAX_COLA) return estado(m.id, "error", { msg: "La fila está llena. Intenta en unos minutos." });
     const l = p.slice(); l.id = m.id;
     const alm = Number(m.almacen); if (alm >= 1 && alm <= 3) ALM_PEDIDO[m.id] = alm;   // la tienda eligió el almacén
@@ -4616,6 +4619,12 @@ iniciar();
     try { beep(); } catch (e) { /* sin audio */ }
     pumpCola(); render();
     if (!cola.includes(l)) estado(m.id, "cola", { delante: 0, msg: "Pedido recibido. Preparando…" });
+    else {
+      const delante = cola.indexOf(l) + (LV.activo || st.enviando || st.armado ? 1 : 0);
+      const porCarro = window.AGV && !window.AGV.puedeCargar();
+      estado(m.id, "cola", { delante, msg: porCarro ? "Tu pedido está en la fila: empieza cuando el carro regrese a la posición de carga."
+        : delante > 0 ? `Tu pedido está en la fila. Hay ${delante} antes que el tuyo.` : "Tu pedido es el siguiente." });
+    }
   }
 
   // --- se engancha a las funciones existentes sin cambiarlas ---
@@ -4678,7 +4687,7 @@ iniciar();
       case "DETENIDO": a.pausa = true; estado(a.id, "pausa", { msg: "Tu pedido está en pausa. Un momento…" }); break;
       case "CICLO_OK":
         carroPoner(a.grano);
-        estado(a.id, "vaso_listo", { vaso: LOTE });
+        estado(a.id, "vaso_listo", { vaso: a.ref && a.ref.reduce ? a.ref.reduce((x, y) => x + y, 0) || LOTE : LOTE });
         if (LV.activo && LV.activo.id === a.id) estado(a.id, "pausa", { msg: "Verificando la calidad de tus vasos…" });   // "listo" llega al completar el lote
         else estado(a.id, "listo", { msg: "¡Pedido completo! Retira tu último vaso." });
         if (actual === a) actual = null; break;

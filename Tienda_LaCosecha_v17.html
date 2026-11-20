@@ -491,7 +491,7 @@ body{background:
     <!-- 1 · ELEGIR -->
     <section class="vista" id="vElegir">
       <div class="elegir">
-        <h1>Arma tu lote de 3 porciones</h1>
+        <h1>Arma tu lote: 1, 2 o 3 porciones</h1>
         <p class="bajada">Cada porción se sirve en su propio vaso. Puedes repetir grano.</p>
         <p class="aviso" id="aviso" role="status" hidden></p>
         <div class="costales" id="costales"></div>
@@ -587,7 +587,7 @@ const GRANOS = [
   { n: "Maíz",     c: "#f2b632", k: "#c98a0e", h: "#ffdd7a", forma: "maiz",
     dato: "Es la base de la tortilla. México tiene más de 50 razas nativas de maíz." }
 ];
-const LOTE = 3;
+const LOTE = 3;                     // v17: máximo por lote (puede ser 1, 2 o 3)
 // Vacío = se calcula solo desde la dirección de la página.
 const WS_URL = "";
 // true = si no hay servidor, simula el pedido (para probar el diseño). Ponlo en false para uso real.
@@ -698,7 +698,7 @@ function secuencia() {                      // tolva de cada vaso, en el orden e
 let vasosPrevios = null;
 function pintar() {
   const t = total(), sinServ = !enLinea && !PERMITIR_DEMO, sinHmi = sinServ || (enLinea && !hmiOn), sinCarro = !disp.pedir;
-  $("aviso").hidden = !sinCarro || !!pedido; $("aviso").textContent = disp.msg || "El carro de entrega está ocupado. Espera un momento.";
+  $("aviso").hidden = !sinCarro || !!pedido; $("aviso").textContent = disp.msg || "El carro de entrega está ocupado: tu pedido se formará en la fila.";
   GRANOS.forEach((g, i) => {
     $("q" + i).textContent = q[i];
     $("m" + i).disabled = q[i] === 0;
@@ -710,7 +710,7 @@ function pintar() {
   const seq = secuencia(), firma = seq.join(",");
   if (firma !== vasosPrevios) {
     vasosPrevios = firma;
-    $("vasosSel").innerHTML = Array.from({ length: LOTE }, (_, k) => {
+    $("vasosSel").innerHTML = Array.from({ length: Math.max(1, seq.length) }, (_, k) => {
       const g = seq[k] !== undefined ? GRANOS[seq[k]] : null;
       return `<div class="vasoSel">${vasoSvg(g, 100 + k, false)}<small>${g ? g.n : "Vaso " + (k + 1)}</small></div>`;
     }).join("");
@@ -723,14 +723,14 @@ function pintar() {
   const falta = LOTE - t;
   $("ayuda").textContent = sinServ ? "Sin conexión con el servidor. Abre la tienda con la dirección que muestra la terminal (npm start)."
     : sinHmi ? "El dispensador no está disponible por ahora. Avisa al encargado."
-    : t === 0 ? "Toca + en un costal para servir tu primer vaso."
-    : falta > 0 ? `Te ${falta === 1 ? "falta 1 vaso" : `faltan ${falta} vasos`} para completar el lote.`
+    : t === 0 ? "Toca + en un costal para servir tu primer vaso (puedes pedir 1, 2 o 3)."
     : !almElegido ? "Elige a qué almacén mandamos tu pedido."
-    : sinCarro ? "Tu lote está listo. Podrás confirmarlo cuando el carro regrese a la posición de carga."
+    : sinCarro ? "Tu pedido se formará en la fila: empieza cuando el carro regrese a la posición de carga."
+    : falta > 0 ? `Lote de ${t} ${t === 1 ? "vaso" : "vasos"}. Puedes agregar hasta ${falta} más, o confirmar así.`
     : "¡Lote completo! Revisa y confirma tu pedido.";
-  $("conf").disabled = t !== LOTE || !almElegido || sinHmi || sinCarro;
+  $("conf").disabled = t < 1 || !almElegido || sinHmi;      // v17: con el carro fuera también: se forma en la fila
   document.querySelectorAll("#almBtns button").forEach(b => { b.classList.toggle("on", Number(b.dataset.a) === almElegido); b.disabled = !!pedido; });
-  if (!pedido) marcarPaso(t === LOTE ? 1 : 0);   // con pedido en curso, los pasos los marca su avance
+  if (!pedido) marcarPaso(t >= 1 ? 1 : 0);   // con pedido en curso, los pasos los marca su avance
 }
 function marcarPaso(n) {
   [...$("pasos").children].forEach((li, k) => { li.className = k < n ? "hecho" : k === n ? "on" : ""; });
@@ -851,9 +851,9 @@ function estacion(k, terminado) {
 
 /* ===== Pedido ===== */
 function pedir() {
-  if (total() !== LOTE || pedido) return;
+  if (total() < 1 || total() > LOTE || pedido) return;
   vibra();
-  pedido = { id: "P" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), vs: ["pend", "pend", "pend"], fin: false, gr: secuencia(), re: {} };
+  pedido = { id: "P" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), vs: secuencia().map(() => "pend"), fin: false, gr: secuencia(), re: {} };
   $("segV").innerHTML = secuencia().map((g, k) =>
     `<div class="copa pend" style="--c:${GRANOS[g].c}"><div class="chorro"><i></i><i></i><i></i></div>
        <span class="veces"></span>${vasoSvg(GRANOS[g], 200 + k, true)}<small>${GRANOS[g].n}</small><span class="est">En espera</span></div>`).join("");
@@ -865,6 +865,11 @@ function pedir() {
   setTimeout(() => enviar({ tipo: "pedido", id, p, almacen }), 800);       // p = porciones de la tolva 1, 2 y 3
 }
 /* pedido entregado, pero el carro aún no vuelve a carga: se espera antes de dejar pedir otro */
+/* v17: los pedidos se forman en FILA: se puede hacer otro aunque el anterior siga en proceso */
+function ofrecerOtro() {
+  if (!$("otro").hidden && !$("otro").disabled) return;
+  $("otro").hidden = false; $("otro").disabled = false; $("otro").textContent = "＋ Hacer otro pedido (se forma en la fila)";
+}
 function esperarCarro() {
   esperandoCarro = true;
   clearTimeout(tReinicio); clearInterval(tCuenta);
@@ -965,11 +970,12 @@ function recibir(m) {
   if (m.tipo === "agv_pos") { posCarro(m); return; }
   if (m.tipo === "disponibilidad") { disp = { pedir: !!m.pedir, msg: m.msg || "", agv: m.agv || "" }; actualizarDisp(); return; }
   if (m.tipo !== "estado" || !pedido || (m.id && m.id !== pedido.id)) return;
-  const i = Math.min(2, Math.max(0, (m.vaso || 1) - 1)), g = GRANOS[(m.grano || 1) - 1];
+  const i = Math.min(pedido.vs.length - 1, Math.max(0, (m.vaso || 1) - 1)), g = GRANOS[(m.grano || 1) - 1];
   if (m.repo && ["esperando_vaso", "sirviendo", "vaso_listo", "pausa", "retirar"].includes(m.fase)) { vasoRepo(m); pintarSeg(); return; }
   switch (m.fase) {
     case "cola":
       $("segT").textContent = "Tu pedido está en fila"; estacion(-1);
+      ofrecerOtro();
       mensaje(m.msg || (m.delante > 0 ? `Hay ${m.delante} pedido${m.delante > 1 ? "s" : ""} antes que el tuyo.` : "Tu pedido es el siguiente.")); break;
     case "esperando_vaso":
       $("segT").textContent = "Preparando tu pedido"; estacion(0);
@@ -993,7 +999,7 @@ function recibir(m) {
     case "retirar": mensaje(m.msg || `Retira el vaso ${i + 1}.`); break;
     case "entrega": {
       const d = m.almacen || 0;
-      pedido.vs = ["hecho", "hecho", "hecho"];
+      pedido.vs = pedido.vs.map(() => "hecho");
       mostrarRuta(true); estacion(4); marcarPaso(3);
       $("segT").textContent = m.etapa === "descargando" ? `Llegó al Almacén ${d}` : m.etapa === "cargado" ? "Tu lote está listo" : "Tu pedido va en camino";
       mensaje(m.msg || (d ? `Va en camino al Almacén ${d}.` : "El carro sale a entregar tu lote."));
@@ -1003,14 +1009,14 @@ function recibir(m) {
     }
     case "listo":
       if (m.almacen) {                                 // entregado por el carro AGV
-        pedido.vs = ["hecho", "hecho", "hecho"]; pedido.fin = true;
+        pedido.vs = pedido.vs.map(() => "hecho"); pedido.fin = true;
         mostrarRuta(true); rutaDestino(m.almacen, true); rutaIr("a" + m.almacen);
         estacion(4, true); marcarPaso(4);
         $("segT").textContent = "¡Pedido entregado!"; mensaje(m.msg || `Tu pedido fue entregado en el Almacén ${m.almacen}.`, "bien"); festejo();
         if (disp.pedir) terminar(ESPERA_REINICIO / 1000); else esperarCarro();
         break;
       }
-      pedido.vs = ["hecho", "hecho", "hecho"]; pedido.fin = true; estacion(3, true);
+      pedido.vs = pedido.vs.map(() => "hecho"); pedido.fin = true; estacion(3, true);
       $("segT").textContent = "¡Gracias por tu pedido!"; mensaje(m.msg || "¡Pedido completo!", "bien"); festejo();
       terminar(ESPERA_REINICIO / 1000); break;
     case "error":

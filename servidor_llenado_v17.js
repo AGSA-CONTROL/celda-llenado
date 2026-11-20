@@ -434,7 +434,7 @@ wss.on("connection", (ws, req) => {
     if (ws.rol === "tienda") {
       if (m.tipo === "pedido") {
         const p = m.p;
-        const ok = idValido(m.id) && Array.isArray(p) && p.length === 3 && p.every(x => Number.isInteger(x) && x >= 0) && p[0] + p[1] + p[2] === 3;
+        const ok = idValido(m.id) && Array.isArray(p) && p.length === 3 && p.every(x => Number.isInteger(x) && x >= 0) && p[0] + p[1] + p[2] >= 1 && p[0] + p[1] + p[2] <= 3;   // v17: lote de 1, 2 o 3
         if (!ok) return enviar(ws, { tipo: "estado", id: String(m.id).slice(0, 40), fase: "error", msg: "Pedido no válido." });
         const almacen = Number(m.almacen);
         if (!(almacen >= 1 && almacen <= 3 && Number.isInteger(almacen))) return enviar(ws, { tipo: "estado", id: m.id, fase: "error", msg: "Elige a qué almacén va tu pedido." });

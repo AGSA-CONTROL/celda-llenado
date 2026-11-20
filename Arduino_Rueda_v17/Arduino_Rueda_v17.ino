@@ -711,11 +711,16 @@ void tareasEstaciones(long dt){
 
   if(!vaso[3].verificado && (!vaso[3].presente || sensorVisto[3] || esperaVencida[3])){
     vaso[3].verificado = true;
-    if(vaso[3].presente && sensorVisto[3]){ if(vaso[3].cuenta){ buenos++; Serial.println("CUENTA,BUENO"); } dispararActuador(); reportarVerif(vaso[3].grano, true); }   // dispensado + tapa (pin 10): bueno -> se retrae
+    if(vaso[3].presente && sensorVisto[3]){
+      if(vaso[3].cuenta){ buenos++; Serial.println("CUENTA,BUENO"); }
+      Serial.println(actEstado == ACT_REPOSO ? F("ACT,auto,1,retrae") : actEstado == ACT_REGRESANDO ? F("ACT,auto,1,retrae_al_terminar") : F("ACT,auto,1,ya_retraido"));   // para ver en el HMI qué hizo
+      dispararActuador(); reportarVerif(vaso[3].grano, true);
+    }   // dispensado + tapa (pin 10): bueno -> se retrae
     else if(vaso[3].presente){                                   // RECHAZO (sin tapa): se avisa YA, no hasta que la rueda gire
       vaso[3].rech = true;                                       // así el HMI manda al dispensador la reposición enseguida y el vaso
       if(vaso[3].cuenta){ rech++; Serial.println("CUENTA,RECHAZO"); }   // vacío que está en Llenado se sirve (antes se quedaba esperando
       reportarVerif(vaso[3].grano, false);                       // el OK de Llenado y la rueda se paraba)
+      Serial.println(actEstado == ACT_SOSTENIDO ? F("ACT,auto,0,extiende") : actEstado == ACT_HACIA_ACTIVO ? F("ACT,auto,0,extiende_al_terminar") : F("ACT,auto,0,ya_extendido"));
       actuadorAMerma();                                          // extendido hacia la merma
     }
   }
