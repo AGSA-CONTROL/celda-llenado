@@ -4759,6 +4759,7 @@ function avisoConteo(forzar) {
   const total = esperaCaida();
   const o = !s ? { tipo: "salida_conteo", fase: "" }
     : s.fase === "estacion" ? { tipo: "salida_conteo", fase: "estacion", total }
+    : s.esperaTapa ? { tipo: "salida_conteo", fase: "tapa", total }
     : { tipo: "salida_conteo", fase: "conteo", total, resta: Math.max(0, total - (now - s.tConteo) / 1000) };
   enviarServidor(o);
 }
@@ -4771,7 +4772,7 @@ function salidaLista() {
 }
 function empezarConteo(motivo) {
   const s = LV.salida; if (!s || s.fase !== "estacion") return;
-  s.fase = "conteo"; s.tConteo = Date.now(); s.cerrado = true;
+  s.fase = "conteo"; s.tConteo = Date.now(); s.cerrado = true; s.tapaFin = false;
   if (window.AGV) window.AGV.cerrar(true);             // la rueda ya no suelta vasos buenos: el carro tiene su lote
   log(`⏱ ${motivo}: empieza el conteo de ${esperaCaida()} s para que salga el carro.`);
   avisoConteo(true);
@@ -4781,7 +4782,7 @@ function caida(g) {
   LV.pendCaida = Math.max(0, LV.pendCaida - 1);
   log(`⬇ Vaso de ${cal.granos[g - 1]} cayó al carro.`);
 }
-function tapaFin() { }
+function tapaFin() { if (LV.salida) LV.salida.tapaFin = true; }   // TAPA_FIN de la rueda: terminó el tapado
 /* cada trama de la rueda: espera el cambio de estación y luego cuenta */
 function ginTick(d) {
   const s = LV.salida; if (!s) return;
@@ -4790,7 +4791,14 @@ function ginTick(d) {
     if (e === 2) s.giro = true;                                        // la rueda está girando
     else if (s.giro) empezarConteo("La rueda cambió de estación");     // ya terminó de girar: cambió de estación
     else if (Date.now() - s.t0 > 25000) empezarConteo("La rueda no giró en 25 s");
-  } else if (Date.now() - s.tConteo >= esperaCaida() * 1000) { salidaLista(); return; }
+  } else if (Date.now() - s.tConteo >= esperaCaida() * 1000) {
+    /* v17: antes de irse, el vaso que quedó en TAPADO termina de recibir su tapa (la rueda está parada
+       por el carro, pero el tapado sigue). Si no hay vaso lleno sin tapa en Tapado, sale ya. */
+    const enTapado = d.cups && d.cups[2] === "F";
+    if (enTapado && !s.tapaFin && Date.now() - s.tConteo < 30000) {
+      if (!s.esperaTapa) { s.esperaTapa = true; log("⏳ Terminó la espera: el carro sale cuando termine el tapado del vaso que está en Tapado."); avisoConteo(true); }
+    } else { salidaLista(); return; }
+  }
   avisoConteo(false);
 }
 /* v17: EL CARRO SIGUE A LA TIENDA. El vaso se pone en el carro en cuanto se sirve (cuando la tienda lo marca

@@ -688,8 +688,11 @@ function pintarConteo(){
   if(CONTEO.fase && performance.now() - CONTEO.t > 6000) CONTEO.fase = "";   // el HMI dejó de avisar
   box.hidden = !CONTEO.fase;
   if(!CONTEO.fase) return;
-  box.classList.toggle("espera", CONTEO.fase === "estacion");
-  if(CONTEO.fase === "estacion"){
+  box.classList.toggle("espera", CONTEO.fase === "estacion" || CONTEO.fase === "tapa");
+  if(CONTEO.fase === "tapa"){
+    $("#conteoTxt").textContent = "Terminó la espera. El carro sale en cuanto termine de taparse el vaso que está en Tapado…";
+    $("#conteoNum").textContent = "0.0 s"; $("#conteoBarra").style.width = "100%";
+  } else if(CONTEO.fase === "estacion"){
     $("#conteoTxt").textContent = "Lote completo. Esperando que la rueda cambie de estación para empezar el conteo…";
     $("#conteoNum").textContent = CONTEO.total.toFixed(1) + " s"; $("#conteoBarra").style.width = "0%";
   } else {
