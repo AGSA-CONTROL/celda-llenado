@@ -2585,7 +2585,24 @@ function vozDeGIN(d, p, primera){
   } else VOZ_F0.desde = 0;
 }
 
+/* v17 (físico): el siguiente pedido no se sirve hasta que Verificación termine el lote actual. Mientras tanto,
+   los vasos VACÍOS que entran por la rampa llegan a Llenado sin nada que servir: si la rueda los espera, se
+   quedaría parada (el lote actual nunca llegaría a Verificación). Igual que el operador virtual del simulador:
+   si en Llenado hay un vaso vacío y no hay nada que servirle, a los 3 s pasa vacío (OK de Llenado) y se va a la merma. */
+function vacioPasa(d){
+  if(MODO_SIM || !H.autoOk || !CTL.gin.conectado || !window.DISP){ H.tVacioE1 = 0; return; }
+  const s = DISP.estado(), lv = DISP.loteActivo();
+  const nadaQueServir = DISP.listoParaServir() && !s.armado && !s.enviando && !s.dispensando && !(lv && sumA(lv.repo) > 0) && !(DISP.hayCola() && !lv);
+  if(Number(d.estado) === 9 && d.cups && d.cups[1] === "E" && nadaQueServir){
+    if(!H.tVacioE1) H.tVacioE1 = Date.now();
+    else if(Date.now() - H.tVacioE1 > 3000){
+      H.tVacioE1 = 0; enviarCtl("gin", "OK_LLENADO");
+      DISP.log("➡ Vaso vacío en Llenado sin pedido que servir (el lote actual se está verificando): pasa vacío a la merma.");
+    }
+  } else H.tVacioE1 = 0;
+}
 function onGIN(d){
+  vacioPasa(d);
   const p = H.gin, primera = !H.ginVisto;
   if(window.DISP && !CTL.gin.e2Firmware){
     const e2 = d.sens[1] === "1" ? "E2,1" : "E2,0";
@@ -3779,7 +3796,10 @@ window.AGV = AGV;
   function decideRech(c2){
     const lv = window.DISP ? DISP.loteActivo() : null;
     if(!lv) return false;
-    if(lv !== RQ.loteObj){ RQ.loteObj = lv; RQ.pasados = {}; RQ.hechos = []; }
+    if(lv !== RQ.loteObj){                                 // empezó otro lote: las marcas del anterior ya no cuentan
+      if(RQ.loteObj){ RQ.marcas = []; RQ.firma = ""; }
+      RQ.loteObj = lv; RQ.pasados = {}; RQ.hechos = [];
+    }
     const g = c2.grano, o = (RQ.pasados[g] = (RQ.pasados[g] || 0) + 1);   // o = es el vaso o-ésimo de ese grano
     const sq = secLote(lv.p); let n = 0, pos = -1;
     for(let k = 0; k < sq.length; k++) if(sq[k] === g && ++n === o){ pos = k; break; }
@@ -5095,6 +5115,8 @@ return {
   alConectarE2: () => alConectarE2(),
   desconectarE2: () => desconectarE2(),
   estado: () => st,
+  listoParaServir: () => !!(link && st.listo && !st.emergencia),
+  hayCola: () => cola.length > 0,
   render: () => render(),
 };
 })();
