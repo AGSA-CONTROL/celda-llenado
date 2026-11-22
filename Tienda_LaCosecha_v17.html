@@ -987,11 +987,12 @@ function vasoRepo(m) {
   const gr = pedido.gr || [], vs = pedido.vs;
   const buscar = (estados, g) => vs.findIndex((e, j) => estados.includes(e) && (g == null || gr[j] === g));
   if (m.fase === "esperando_vaso") {
-    if (buscar(["esp", "sirv"]) < 0) { const k = buscar(["rech"]); if (k >= 0) vs[k] = "esp"; }
+    /* v17: el vaso rechazado SE QUEDA marcado como rechazado (rojo) hasta que se empieza a servir de nuevo */
+    $("segT").textContent = "Un vaso no pasó la revisión";
+    mensaje("Vaso rechazado: esperamos un vaso nuevo para servirlo otra vez. El carro no sale hasta que esté bien.", "mal");
   } else if (m.fase === "sirviendo") {
     const g = (m.grano || 1) - 1;
     let k = buscar(["esp"], g); if (k < 0) k = buscar(["rech"], g);
-    const otro = buscar(["esp"]); if (otro >= 0 && otro !== k) vs[otro] = "rech";
     if (k >= 0) { vs[k] = "sirv"; pedido.re[k] = (pedido.re[k] || 0) + 1; }
     $("segT").textContent = "Reponiendo tu vaso"; estacion(1);
     mensaje(`Sirviendo de nuevo ${GRANOS[g] ? GRANOS[g].n : ""}…`);
