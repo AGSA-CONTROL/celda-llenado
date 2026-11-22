@@ -850,6 +850,23 @@ button.chipModo{cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px;pa
 #chipAgv{white-space:nowrap}
 #chipAgv[data-modo]::after{content:attr(data-modo);margin-left:6px;padding:1px 5px;border-radius:4px;font-size:10px;letter-spacing:.04em;background:rgba(255,255,255,.12);color:var(--text)}
 .modoNota{display:block;margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.35;text-align:center}
+/* v17: el dibujo del actuador más grande + vista ampliada */
+@media (min-width:1180px){
+  .ginLayout .cAct{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-rows:auto auto auto!important;column-gap:10px!important}
+  .ginLayout .cAct h3{grid-column:1/-1!important}
+  .ginLayout .cAct #svgAct{grid-column:1/-1!important;grid-row:2!important;width:100%!important;height:clamp(190px,27vh,300px)!important;max-height:none!important;min-height:0!important}
+  .ginLayout .cAct .status{grid-column:1!important;grid-row:3!important;margin:8px 0 0!important;align-self:center}
+  .ginLayout .cAct .row{grid-column:2!important;grid-row:3!important;margin-top:8px!important;flex-direction:row!important;gap:6px!important}
+  .ginLayout .cAct .row .btn{width:auto!important;min-height:36px;font-size:12.5px;padding:4px 10px}
+}
+.cAct h3{display:flex;align-items:center;gap:8px}
+.actZoomBtn{margin-left:auto;min-height:26px!important;padding:2px 10px!important;font-size:11.5px!important;letter-spacing:0;text-transform:none}
+#actZoom{position:fixed;inset:0;z-index:300;background:rgba(5,8,12,.78);backdrop-filter:blur(4px);display:grid;place-items:center;padding:24px}
+#actZoom[hidden]{display:none}
+#actZoom .caja{width:min(1100px,96vw);background:var(--panel);border:1px solid var(--yellow);border-radius:16px;padding:16px 20px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+#actZoom .caja h4{margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;color:var(--yellow);letter-spacing:.06em}
+#actZoom #svgAct{width:100%!important;height:auto!important;max-height:72vh!important}
+#actZoom .status{font-size:18px!important;padding:10px 14px!important;margin-top:8px}
 </style>
 <script>
 /* almacén que eligió la tienda para cada pedido (id -> 1..3) */
@@ -990,6 +1007,9 @@ window.ALM_PEDIDO = {};
   </header>
 
   <div id="vozPanel" hidden role="dialog" aria-label="Voz del HMI"></div>
+  <div id="actZoom" hidden role="dialog" aria-label="Actuador lineal en grande"><div class="caja">
+    <h4>ACTUADOR LINEAL E3 · VERIFICACIÓN <button type="button" class="btn sm" id="actZoomCerrar">✕ Cerrar</button></h4>
+    <div id="actZoomDentro"></div></div></div>
   <div id="body">
     <nav id="sidebar" aria-label="Navegación">
       <button class="nav" data-view="viewGinebra" data-role="1"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="6" r="1.6" fill="currentColor"/><circle cx="12" cy="18" r="1.6" fill="currentColor"/></svg><span>Rueda de Ginebra</span></button>
@@ -1075,7 +1095,7 @@ window.ALM_PEDIDO = {};
               <label class="chk" style="margin-top:10px"><input type="checkbox" id="chkAutoOk" checked> OK de Llenado automático al terminar de dispensar</label>
             </section>
             <section class="grp span2 cAct">
-              <h3>Actuador lineal E3 · aprobado / rechazado</h3>
+              <h3>Actuador lineal E3 · aprobado / rechazado <button type="button" class="btn sm actZoomBtn" id="actZoomBtn" title="Ver el actuador en grande">⤢ Ver grande</button></h3>
               <svg id="svgAct" viewBox="0 0 340 240" role="img" aria-label="Actuador lineal de desvío en Verificación: retraído = paso al carro, extendido = a la merma">
                 <defs>
                   <linearGradient id="gBody" x1="0" y1="0" x2="1" y2="0">
@@ -1148,7 +1168,7 @@ window.ALM_PEDIDO = {};
               </svg>
               <div class="status" id="actEstado">RETRAÍDO · paso libre al carro</div>
               <p class="hint hintMin" style="margin:10px 0 0"><b style="color:var(--green)">RETRAÍDO</b>: la compuerta está arriba y el vaso pasa al carro. <b style="color:var(--red)">EXTENDIDO</b>: la compuerta baja y desvía el vaso a la merma. Con tapa se retrae; sin tapa se extiende; y se queda así hasta el siguiente vaso.</p>
-              <div class="row" style="margin-top:12px"><button class="btn sm" id="btnActOk" type="button">Probar vaso con tapa</button><button class="btn sm red" id="btnActRech" type="button">Probar vaso sin tapa</button></div>
+              <div class="row" id="actPruebaRow" style="margin-top:12px"><button class="btn sm" id="btnActOk" type="button">Probar vaso con tapa</button><button class="btn sm red" id="btnActRech" type="button">Probar vaso sin tapa</button></div>
             </section>
           </div>
         </div>
@@ -2983,6 +3003,27 @@ function actVisual(tipo){
   T(() => { actLimpiar(); actTexto(); }, ACT_VIS.limpiar);
 }
 
+/* v17: ver el actuador en grande (se mueve el mismo dibujo, así sigue animando) */
+(() => {
+  const btn = $("#actZoomBtn"), zoom = $("#actZoom"), dentro = $("#actZoomDentro"), cerrar = $("#actZoomCerrar");
+  if(!btn || !zoom) return;
+  let casa = null, sig = null;
+  const abrir = () => {
+    const svg = $("#svgAct"), est = $("#actEstado"); if(!svg) return;
+    casa = svg.parentNode; sig = est ? est.nextSibling : svg.nextSibling;
+    dentro.appendChild(svg); if(est) dentro.appendChild(est);
+    zoom.hidden = false;
+  };
+  const cerrarZ = () => {
+    const svg = $("#svgAct"), est = $("#actEstado");
+    if(casa){ casa.insertBefore(svg, sig); if(est) casa.insertBefore(est, sig); }
+    zoom.hidden = true;
+  };
+  btn.addEventListener("click", abrir);
+  cerrar.addEventListener("click", cerrarZ);
+  zoom.addEventListener("click", (e) => { if(e.target === zoom) cerrarZ(); });
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape" && !zoom.hidden) cerrarZ(); });
+})();
 function renderGin(){
   const g = H.gin;
   const st = $("#ginEstado");
@@ -3689,6 +3730,7 @@ window.AGV = AGV;
   ["#selBaudGin", "#selBaudDisp"].forEach(id => { $(id).closest(".fld").hidden = MODO_SIM; });
   $("#cardSim").hidden = !MODO_SIM;
   $("#simRechBox").hidden = !MODO_SIM;
+  { const r = $("#actPruebaRow"); if(r) r.style.display = MODO_SIM ? "" : "none"; }   // v17: probar tapa / sin tapa solo en el simulador
   const chk = $("#chkSimOk"); if(chk) chk.closest("label").hidden = true;   // lo hace el operador virtual
   if(MODO_SIM){ H.autoOk = true; const a = $("#chkAutoOk"); if(a) a.checked = true; }   // sin esto el simulador se quedaría esperando el OK
   $("#commHeader").textContent = MODO_SIM
