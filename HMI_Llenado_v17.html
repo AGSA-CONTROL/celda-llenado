@@ -3479,11 +3479,16 @@ const AGV = (() => {
             msg: d && d !== dest ? `Tu lote va en camino al Almacén ${dest} (pasando por el Almacén ${d}).` : `Tu lote va en camino al Almacén ${dest}.` });
           break;
         }
-        case "llegada":                      // el carro está entregando en SU almacén: la tienda lo marca como entregado
-          log(`✔ Lote ${lote ? lote.n : ""} entregado en el Almacén ${d}.`);
+        case "llegada":                      // el carro llegó a SU almacén y está descargando
+          log(`🚚 El carro llegó al Almacén ${d}: descargando el lote ${lote ? lote.n : ""}.`);
+          tienda(lote, "entrega", { etapa:"en_ruta", almacen:d, msg:`El carro llegó al Almacén ${d}: está bajando tu pedido.` }); break;
+        case "entregado":                    // ya bajó todo: ahora sí la tienda lo marca como entregado
+          log(`✔ Lote ${lote ? lote.n : ""} entregado en el Almacén ${d}: el carro regresa a carga.`);
           tienda(lote, "listo", { almacen:d, msg:`¡Tu pedido fue entregado en el Almacén ${d}!` }); break;
-        case "entregado":
-          log(`🚚 Descarga terminada en el Almacén ${d}: el carro regresa a carga.`); break;
+        case "no_descargo":                  // v17: llegó pero el producto NO bajó: da otra vuelta
+          toast(`⚠ El carro no dejó el producto en el Almacén ${d}: da otra vuelta.`);
+          log(`⚠ No se descargó el producto en el Almacén ${d} (quedan ${m.quedan || "?"} vasos): el carro da otra vuelta hasta dejarlo.`);
+          tienda(lote, "entrega", { etapa:"en_ruta", almacen:d, msg:`El carro no pudo dejar tu pedido en el Almacén ${d}: da otra vuelta para entregarlo.` }); break;
         case "en_carga":
           VOZ.decir("agvCarga");             // VOZ: el carro espera el siguiente producto
           log("🚚 El carro regresó a la posición de carga. Ya puede empezar el siguiente lote.");
@@ -4330,7 +4335,7 @@ function procesar(msg) {
     case "QUITAR_VASO":
       avisar(cola.length
         ? "Retira el recipiente: suelta E2 y vuelve a presionarlo para el siguiente lote."
-        : `✔ Lote terminado. Retira el recipiente (suelta E2) y registra otro lote de ${LOTE}.`, true);
+        : `✔ Lote terminado. Retira el recipiente (suelta E2) y registra otro lote (1 a ${LOTE}).`, true);
       break;
     case "SIN_VASO": st.dispensando = false; st.espera = true; log("⚠ Sin recipiente en E2: dispensado en pausa."); break;
     case "CANCELADO": st.armado = false; st.loteArmado = null; break;

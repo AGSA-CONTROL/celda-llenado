@@ -99,6 +99,8 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 .ctl h3{margin-bottom:2px}
 .paso{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-top:4px}
 .pnum{width:22px;height:22px;border-radius:50%;background:var(--yellow);color:#1b1204;font-size:13px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.simFalla{display:flex;gap:8px;align-items:flex-start;margin-top:8px;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.simFalla input{margin-top:2px;accent-color:#f5a623}
 .velFld{margin-top:6px;padding-top:12px;border-top:1px solid var(--border)}
 .velFld label{display:flex;justify-content:space-between}
 .velFld label b{color:var(--text);letter-spacing:0}
@@ -327,6 +329,7 @@ pre.proto{max-height:none}
         <div class="paso"><span class="pnum">2</span>Mueve el carro</div>
         <div class="row"><button class="btnAvanzar" id="btnEnviar" type="button">▶ AVANZAR</button><button class="paro btnParo2" id="btnParo2" type="button">⛔ PARO</button></div>
         <p class="nota notaCtl" id="notaCtl"></p>
+        <label class="simFalla" id="simFallaFld" hidden><input type="checkbox" id="simFalla"> Simular que <b>NO baja el producto</b> en la próxima descarga (el carro da otra vuelta)</label>
         <div class="fld velFld"><label for="vel">Velocidad del carro <b id="velTxt">60 %</b></label><input type="range" id="vel" min="20" max="100" step="5" value="60"></div>
         <p class="nota" id="destNota">QR-HOME = estación de carga · QR-E1, E2 y E3 = almacenes. Los maestros ponen los QR de los almacenes donde quieran: el carro busca el QR del almacén elegido y ahí descarga (si pasa por otro QR, se para un momento y sigue). El dibujo solo muestra el almacén al que se manda.</p>
       </section>
@@ -749,6 +752,11 @@ function leerQrEstacion(n){
   qrLeido(n);
   const cod = n === 0 ? "QR-HOME" : "QR-E" + n;
   const yendo = st.prev === "A_ALMACEN";
+  if(n === 0 && yendo && st.lote && st.vasos.length){       // v17: todavía lleva el producto: pasa por HOME y sigue al almacén
+    log(`🔳 QR leído: QR-HOME · de paso (todavía lleva el producto al Almacén ${st.lote.destino}).`);
+    evento("qr", { codigo:cod, estacion:0, almacen:null });
+    st.s = S.carga; st.estado = "A_ALMACEN"; return;
+  }
   if(n === 0){ log("🔳 QR leído: QR-HOME."); evento("qr", { codigo:cod, estacion:0, almacen:null }); enCarga(); return; }
   const destino = st.lote ? st.lote.destino : 0;
   if(yendo && n === destino){ log(`🔳 QR leído: ${cod} · es su almacén.`); evento("qr", { codigo:cod, estacion:n, almacen:n }); llegar(n); return; }
@@ -756,11 +764,20 @@ function leerQrEstacion(n){
   evento("qr", { codigo:cod, estacion:n, almacen:n });
   st.estado = st.prev;                                   // sigue la línea
 }
-function llegar(n){ st.s = S["a" + n]; st.lado = 0; st.estado = "DESCARGANDO"; st.descN = st.vasos.length; st.descK = 0; st.t = 0.8 + 1.2 * st.vasos.length + 0.8; st.tSig = 0.8; rampaDescarga(n, true); log(`Llegó al Almacén ${n}: descargando ${st.vasos.length} vaso${st.vasos.length === 1 ? "" : "s"}.`); evento("llegada"); }
+function llegar(n){ st.falla = MODO_SIM && $("#simFalla").checked; st.s = S["a" + n]; st.lado = 0; st.estado = "DESCARGANDO"; st.descN = st.vasos.length; st.descK = 0; st.t = 0.8 + 1.2 * st.vasos.length + 0.8; st.tSig = 0.8; rampaDescarga(n, true); log(`Llegó al Almacén ${n}: descargando ${st.vasos.length} vaso${st.vasos.length === 1 ? "" : "s"}.`); evento("llegada"); }
 function bajarUnVaso(n){                                  // simulador: el siguiente vaso del carro pasa al almacén
   if(!st.vasos.length) return;
   const g = st.vasos.shift(); descargarVaso(n, g); st.descK++;
   log(`⬇ Vaso de ${NOM[g - 1] || "grano"} descargado en el Almacén ${n}.`);
+}
+/* v17: el producto NO bajó en el almacén (el carro todavía trae vasos): avisa y da OTRA VUELTA a ese almacén.
+   Pasa por HOME sin quedarse y solo busca HOME cuando ya dejó el producto. */
+function noDescargo(n){
+  rampaDescarga(n, false); st.descN = 0; st.falla = false; $("#simFalla").checked = false;
+  log(`⚠ No se descargó el producto en el Almacén ${n} (quedan ${st.vasos.length} vaso${st.vasos.length === 1 ? "" : "s"}): da otra vuelta.`);
+  toast(`⚠ No bajó el producto en el Almacén ${n}: el carro da otra vuelta.`);
+  evento("no_descargo", { quedan:st.vasos.length });
+  st.prev = "A_ALMACEN"; st.estado = "A_ALMACEN";
 }
 function entregar(n){
   while(st.vasos.length) bajarUnVaso(n);
@@ -805,8 +822,8 @@ function pasoSimulador(dt){
     case "EN_ESTACION": st.t -= dt; if(st.t <= 0) leerQrEstacion(st.qrN); break;   // detenido leyendo el QR
     case "DESCARGANDO":
       st.t -= dt; st.tSig -= dt;
-      if(st.tSig <= 0 && st.vasos.length){ bajarUnVaso(st.lote.destino); st.tSig = 1.2; render(); publicar(true); }
-      if(st.t <= 0) entregar(st.lote.destino);
+      if(st.tSig <= 0 && st.vasos.length && !st.falla){ bajarUnVaso(st.lote.destino); st.tSig = 1.2; render(); publicar(true); }
+      if(st.t <= 0){ if(st.vasos.length) noDescargo(st.lote.destino); else entregar(st.lote.destino); }
       break;
   }
   if(st.estado !== ant){ render(); publicar(true); }
@@ -1074,6 +1091,7 @@ function render(){
   $("#chipSrv").classList.toggle("ok", SRV.abierto);
   $("#chipHmi").classList.toggle("ok", SRV.hmi);
   const cp = $("#chipEsp"); cp.classList.toggle("ok", MODO_SIM || ESP.online);
+  $("#simFallaFld").hidden = !MODO_SIM;                  // solo el carro simulado puede fingir la falla
   cp.lastChild.textContent = MODO_SIM ? "CARRO SIMULADO" : ESP.online ? `CARRO ESP32 · ${ESP.tel && ESP.tel.sim ? "SIM" : "FÍS"}` : "CARRO ESP32";
   // comunicación
   $("#srvPill").textContent = SRV.abierto ? "CONECTADO" : "SIN CONEXIÓN"; $("#srvPill").classList.toggle("ok", SRV.abierto);
