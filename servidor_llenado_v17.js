@@ -395,6 +395,7 @@ wss.on("connection", (ws, req) => {
         ws.rol = "tienda"; S.tiendas.add(ws);
         enviar(ws, { tipo: "hola_ok", hmi: !!S.hmi, sala: S.nombre }); avisarHmi(S);
         if (S.ultimaDisp) enviar(ws, S.ultimaDisp);
+        if (S.ultimaFila) enviar(ws, S.ultimaFila);
       }
       return;
     }
@@ -464,6 +465,15 @@ wss.on("connection", (ws, req) => {
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "disponibilidad") {     // a TODAS las tiendas de la sala
       S.ultimaDisp = { tipo: "disponibilidad", pedir: !!m.pedir, agv: String(m.agv || "").slice(0, 20), msg: String(m.msg || "").slice(0, 160) };
       S.tiendas.forEach(t => enviar(t, S.ultimaDisp));
+    } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "fila") {   // v17: los pedidos en proceso y en fila -> todas las tiendas
+      const EST = ["en_camino", "saliendo", "preparando", "fila"];
+      const lista = (Array.isArray(m.lista) ? m.lista : []).slice(0, 12).map(x => ({
+        id: idValido(x && x.id) ? String(x.id) : null,
+        p: Array.isArray(x && x.p) ? x.p.slice(0, 3).map(n => Math.max(0, Math.min(3, Number(n) || 0))) : [0, 0, 0],
+        alm: [1, 2, 3].includes(Number(x && x.alm)) ? Number(x.alm) : 0,
+        est: EST.includes(x && x.est) ? x.est : "fila" }));
+      S.ultimaFila = { tipo: "fila", lista };
+      S.tiendas.forEach(t => enviar(t, S.ultimaFila));
     } else if (ws.rol === "hmi" && ws === S.hmi && m.tipo === "salida_conteo") {   // v17: conteo para que salga el carro -> páginas del carro
       const o = { tipo: "salida_conteo", fase: ["estacion", "conteo", "tapa"].includes(m.fase) ? m.fase : "", total: Number(m.total) || 0, resta: Number(m.resta) || 0 };
       S.agvPaginas.forEach(p => enviar(p, o)); S.vistas.forEach(v => enviar(v, o));
@@ -491,7 +501,7 @@ wss.on("connection", (ws, req) => {
     if (ws.rol === "vigia") { S.vigias.delete(ws); limpiarSala(S); avisarListaSalas(); return; }
     setTimeout(() => { limpiarSala(S); avisarListaSalas(); }, 50);
     if (ws === S.hmi) {                                  // el HMI se cayó: la cola en memoria se perdió
-      S.hmi = null; S.ultimaDisp = null;
+      S.hmi = null; S.ultimaDisp = null; S.ultimaFila = null;
       S.pedidos.forEach((r, id) => {
         if (r.ultimo && (r.ultimo.fase === "listo" || r.ultimo.fase === "error")) return;
         r.ultimo = { tipo: "estado", id, fase: "error", msg: "Se perdió la conexión con el dispensador. Tu pedido se canceló." };
