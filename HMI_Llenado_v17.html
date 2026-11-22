@@ -92,6 +92,9 @@ input:focus,select:focus{border-color:var(--yellow);outline:none}
 #vozPanel[hidden]{display:none}
 #vozPanel h4{margin:0 0 10px;font-size:14px;letter-spacing:1px}
 #vozPanel .vozFila{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--border)}
+#vozPanel .vozPres{display:grid;gap:6px;padding:9px 10px;margin:6px 0;border:1px solid var(--yellow);border-radius:8px;background:var(--inset);font-size:13px}
+#vozPanel .vozPres label{display:flex;gap:8px;align-items:center;cursor:pointer}
+#vozPanel .vozPres input{accent-color:var(--yellow)}
 #vozPanel .vozFila label{flex:1;display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px}
 #vozPanel .vozFila small{display:block;color:var(--muted);font-size:11px}
 #vozPanel .vozFila button{padding:4px 10px;font-size:12px}
@@ -2457,14 +2460,15 @@ window.VIBR = VIBR;
    ====================================================================== */
 const VOZ = (() => {
   const AUD = {
-    presentacion: { f:"audio/Voz_de_presentacion.mp3",          n:"Presentación",            c:"La rueda llega a home" },
+    presentacion: { f:"audio/Voz_de_presentacion.mp3",          n:"Presentación",            c:"La rueda llega a home (si está elegida abajo)" },
+    director:     { f:"audio/Voz_saludo_director.mp3",          n:"Saludo al director",      c:"La rueda llega a home (si está elegida abajo)" },
     envases:      { f:"audio/Voz_de_embases_en_produccion.mp3", n:"Envases en producción",   c:"Lote en curso y la rampa F0 sin envase 3 s" },
     agvSale:      { f:"audio/Voz_AGV_en_desplazamiento.mp3",    n:"AGV en desplazamiento",   c:"El carro sale a entregar el lote" },
     agvCarga:     { f:"audio/Voz_AGV_esperando_producto.mp3",   n:"AGV esperando producto",  c:"El carro regresa a la posición de carga" },
     calidad:      { f:"audio/Voz_control_de_calidad.mp3",       n:"Control de calidad",      c:"Verificación rechaza un vaso (en ese momento)" }
   };
   const KEY = "hmi01_voz";
-  const cfg = { on:true, vol:1, apagadas:{} };
+  const cfg = { on:true, vol:1, apagadas:{}, pres:"presentacion" };   // pres: qué audio suena al llegar a HOME
   try{ Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || "{}")); }catch(_){}
   if(!cfg.apagadas || typeof cfg.apagadas !== "object") cfg.apagadas = {};
   const el = new Audio(); el.preload = "auto";
@@ -2516,6 +2520,9 @@ const VOZ = (() => {
       <label class="vozMaestro"><input type="checkbox" id="vozOn"> Voz activada</label>
       <div class="vozVol">Volumen <input type="range" id="vozVol" min="0" max="1" step="0.05"></div>
       ${Object.entries(AUD).map(([k, a]) => `<div class="vozFila"><label><input type="checkbox" data-voz="${k}"><span>${a.n}<small>${a.c}</small></span></label><button type="button" class="btn sm" data-probar="${k}">▶ Probar</button></div>`).join("")}
+      <div class="vozPres"><b>Al llegar la rueda a HOME suena:</b>
+        <label><input type="radio" name="vozPres" value="presentacion"> Presentación (la de siempre)</label>
+        <label><input type="radio" name="vozPres" value="director"> Saludo al director</label></div>
       <div class="vozFila"><span style="flex:1"></span><button type="button" class="btn sm" id="vozCallar">■ Callar</button></div>
       <div class="vozAhora" id="vozAhora"></div>`;
     const on = p.querySelector("#vozOn"); on.checked = cfg.on;
@@ -2524,6 +2531,7 @@ const VOZ = (() => {
     vol.oninput = () => { cfg.vol = Number(vol.value); el.volume = cfg.vol; guardar(); };
     p.querySelectorAll("[data-voz]").forEach(c => { c.checked = !cfg.apagadas[c.dataset.voz]; c.onchange = () => { if(c.checked) delete cfg.apagadas[c.dataset.voz]; else cfg.apagadas[c.dataset.voz] = true; guardar(); }; });
     p.querySelectorAll("[data-probar]").forEach(b => b.onclick = () => { desbloquear(); decir(b.dataset.probar, true); });
+    p.querySelectorAll('input[name="vozPres"]').forEach(r => { r.checked = r.value === cfg.pres; r.onchange = () => { if(r.checked){ cfg.pres = r.value; guardar(); } }; });
     p.querySelector("#vozCallar").onclick = callar;
     pintar();
   }
@@ -2535,7 +2543,9 @@ const VOZ = (() => {
     document.addEventListener("click", e => { if(!p.hidden && !p.contains(e.target) && e.target !== b){ p.hidden = true; b.setAttribute("aria-expanded", "false"); } });
   }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", iniciar); else iniciar();
-  return { decir, callar, desbloquear, estado: () => ({ on:cfg.on, listo, sonando, cola:cola.slice(), historial:historial.slice() }) };
+  /* v17: audio de presentación elegido (el de siempre o el saludo al director) */
+  function presentacion(){ return decir(cfg.pres === "director" ? "director" : "presentacion"); }
+  return { decir, callar, desbloquear, presentacion, estado: () => ({ on:cfg.on, listo, sonando, cola:cola.slice(), historial:historial.slice() }) };
 })();
 
 /* F0 sin envase durante un lote: cuenta el tiempo con las tramas GIN */
@@ -2543,7 +2553,7 @@ const VOZ_F0 = { desde:0, avisado:false };
 function vozDeGIN(d, p, primera){
   /* 1) la rueda llegó a home: pulso "home" (0 -> 1) */
   const homeAntes = primera ? 0 : (Number(p.home) || 0);
-  if(Number(d.home) === 1 && homeAntes !== 1) VOZ.decir("presentacion");
+  if(Number(d.home) === 1 && homeAntes !== 1) VOZ.presentacion();   // el que elegiste: presentación o saludo al director
   /* 2) lote en curso y la rampa F0 sin envase 3 s seguidos (una sola vez hasta que F0 vuelva a detectar) */
   const f0 = d.sens && d.sens[0] === "1";
   const lote = window.DISP && DISP.loteActivo ? DISP.loteActivo() : null;
