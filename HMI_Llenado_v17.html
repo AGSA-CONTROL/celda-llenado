@@ -4950,7 +4950,12 @@ function ginTick(d) {
   if (s.fase === "estacion") {
     if (e === 2) s.giro = true;                                        // la rueda está girando
     else if (s.giro) empezarConteo("La rueda cambió de estación");     // ya terminó de girar: cambió de estación
-    else if (Date.now() - s.t0 > 25000) empezarConteo("La rueda no giró en 25 s");
+    /* v17: SIN atajo por tiempo: el carro nunca sale si el último vaso sigue en Verificación
+       (antes, a los 25 s salía aunque la rueda no hubiera girado y se iba con un vaso menos) */
+    else if (Date.now() - s.t0 > 25000 && !s.avisoGiro) {
+      s.avisoGiro = true;
+      log("⏳ El carro espera: la rueda no ha girado y el último vaso del lote sigue en Verificación. Sale cuando ese vaso caiga al carro.");
+    }
   } else if (Date.now() - s.tConteo >= esperaCaida() * 1000) {
     /* v17: antes de irse, el vaso que quedó en TAPADO termina de recibir su tapa (la rueda está parada
        por el carro, pero el tapado sigue). Si no hay vaso lleno sin tapa en Tapado, sale ya. */
