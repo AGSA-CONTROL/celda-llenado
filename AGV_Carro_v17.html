@@ -454,8 +454,8 @@ function log(m){
 /* =====================================================================
    CIRCUITO (mismo dibujo y misma línea que la vista del HMI)
    ===================================================================== */
-const COLOR = ["#8a4060", "#5d4e72", "#f2c12e"];
-const NOM = ["Frijol", "Frijol negro", "Maíz"];
+const COLOR = ["#8a4060", "#e8dcc0", "#f2c12e"];
+const NOM = ["Frijol", "Tapioca", "Maíz"];
 const PARADAS = { carga:[280, 330], qr:[400, 470], a1:[650, 470], a2:[850, 290], a3:[560, 110] };
 const RUTA = "M 280 330 L 280 400 Q 280 470 350 470 L 780 470 Q 850 470 850 400 L 850 180 Q 850 110 780 110 L 350 110 Q 280 110 280 180 Z";
 const TXT = {
@@ -561,7 +561,7 @@ function dibujar(){
   if(!dibujar.hecho){ st.s = S.carga; dibujar.hecho = true; }
   pintarAlmacenes();
 }
-/* ---------- vasos guardados en cada almacén (estante 1 = Frijol, 2 = Frijol negro, 3 = Maíz) ---------- */
+/* ---------- vasos guardados en cada almacén (estante 1 = Frijol, 2 = Tapioca, 3 = Maíz) ---------- */
 const ALM_GEO = { 1:[], 2:[], 3:[] };
 const STOCK = { 1:[0, 0, 0], 2:[0, 0, 0], 3:[0, 0, 0] };   // vasos por grano en cada almacén
 function puntoVaso(n, g, k){                               // lugar del vaso número k (0..) del grano g en el almacén n
