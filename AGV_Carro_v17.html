@@ -34,6 +34,10 @@ button,input,select{font:inherit;color:inherit}
 .chip i{width:8px;height:8px;border-radius:50%;background:var(--red)}
 .chip.ok{color:var(--text)} .chip.ok i{background:var(--green);box-shadow:0 0 8px var(--green)}
 .chipModo{cursor:pointer;background:repeating-linear-gradient(135deg,#f5a623 0 10px,#d48a0f 10px 20px);color:#1b1204;border:0;font-weight:800}
+.chipBt{cursor:pointer} .chipBt.ok{color:var(--text)} .chipBt.ok i{background:#3b82f6;box-shadow:0 0 8px #3b82f6} .chipBt.con i{background:#f5a623}
+.btBox{margin-top:12px;padding:12px;border:1px solid var(--border2);border-radius:10px;background:var(--inset)}
+.btBox .row{display:flex;gap:8px;flex-wrap:wrap}
+.btBox b{display:block;margin-bottom:6px}
 .chipModo.fisico{background:var(--panel2);color:var(--text);border:1px solid var(--border2)}
 #reloj{font-family:var(--mono);font-size:18px;font-weight:700}
 .paro{padding:10px 18px;border-radius:10px;border:0;background:var(--red);color:#fff;font-weight:800;cursor:pointer;box-shadow:0 0 16px rgba(229,72,77,.45)}
@@ -285,6 +289,7 @@ pre.proto{max-height:none}
   <span class="chip" id="chipSrv"><i></i>SERVIDOR</span>
   <span class="chip" id="chipHmi"><i></i>HMI</span>
   <span class="chip" id="chipEsp"><i></i>CARRO ESP32</span>
+  <button type="button" class="chip chipBt" id="chipBt" title="Conectar el carro por Bluetooth" hidden><i></i>🔵 BLUETOOTH</button>
   <button type="button" class="chip chipModo" id="chipModo" title="Cambiar modo de trabajo">MODO</button>
   <div id="reloj">--:--:--</div>
   <button type="button" class="paro" id="btnParo">⛔ DETENER CARRO</button>
@@ -362,7 +367,7 @@ pre.proto{max-height:none}
       <section class="grp wide">
         <div class="cardHead"><h3>¿Qué carro usa esta página?</h3><span class="pill ok" id="modoPill">—</span></div>
         <div class="modoBtns">
-          <button type="button" class="modoBtn" data-modo="esp"><b>Carro real (ESP32 por WiFi)</b><small>Muestra y maneja el carro de verdad. No usa cables ni puertos.</small></button>
+          <button type="button" class="modoBtn" data-modo="esp"><b>Carro real (ESP32 por Bluetooth)</b><small>Muestra y maneja el carro de verdad. No usa cables ni puertos.</small></button>
           <button type="button" class="modoBtn" data-modo="sim"><b>Simulador (sin carro)</b><small>Carro virtual en esta página para probar con el HMI y la tienda</small></button>
         </div>
       </section>
@@ -370,23 +375,31 @@ pre.proto{max-height:none}
       <section class="grp" id="cardEsp">
         <div class="cardHead"><h3>Carro ESP32</h3><span class="pill" id="espPill">SIN CONEXIÓN</span></div>
         <div class="kvs">
-          <div><small>Red WiFi del carro</small><b id="kvRed">—</b></div>
-          <div><small>IP del carro</small><b id="kvIp">—</b></div>
+          <div><small>Conexión del carro</small><b id="kvRed">—</b></div>
+          <div><small>Bluetooth</small><b id="kvIp">—</b></div>
           <div><small>Modo del carro</small><b id="kvModo">—</b></div>
           <div><small>Estado</small><b id="kvEstado">—</b></div>
         </div>
         <div class="ultima" id="espTxt">Esperando al carro…</div>
-        <p class="nota" style="margin-top:10px">El carro se conecta solo al servidor por WiFi. Si no aparece "EN LÍNEA", revisa los pasos de la derecha.</p>
+        <div class="btBox">
+          <b id="btTxt">🔵 Bluetooth: sin conectar</b>
+          <div class="row">
+            <button class="btn green" id="btnBt" type="button">🔵 Conectar carro por Bluetooth</button>
+            <button class="btn red" id="btnBtOff" type="button" hidden>Desconectar</button>
+          </div>
+        </div>
+        <p class="nota" style="margin-top:10px">El carro habla por Bluetooth con ESTA página y ella lo pasa al servidor. Deja esta página abierta mientras trabaja el carro.</p>
       </section>
 
       <section class="grp" id="cardPasos">
-        <h3>Si el carro no se conecta</h3>
+        <h3>Cómo conectar el carro por Bluetooth</h3>
         <ol class="pasos">
-          <li>El carro y la laptop de la rueda deben estar en la <b>misma red WiFi de 2.4 GHz</b>.</li>
-          <li>En la laptop de la rueda debe estar corriendo <code>npm start</code>.</li>
-          <li>El nombre y la contraseña de esa red van en el programa del carro (<code>WIFI_RED</code> y <code>WIFI_CLAVE</code>) o en su panel.</li>
-          <li>Para ver el panel del carro: conéctate a la red <code>SeguidorLineaPID</code> (clave <code>linea1234</code>) y abre <code>http://192.168.4.1</code> → Mantenimiento → Red y servidor.</li>
-          <li>Si Windows preguntó por el firewall al hacer <code>npm start</code>, debe estar en <b>Permitir</b>.</li>
+          <li>Abre esta página en <b>Chrome</b> o <b>Edge</b> (con el link de la nube <code>https://…</code>) en una laptop con Bluetooth encendido.</li>
+          <li>Prende el carro y espera unos 5 segundos.</li>
+          <li>Pulsa <b>🔵 Conectar carro por Bluetooth</b> y elige <code>AGV-CELDA</code> en la lista.</li>
+          <li>La primera vez el carro entra solo a tu sala (esta página le da el permiso).</li>
+          <li>Deja esta página abierta: si se corta, se vuelve a conectar sola. Si recargas la página, pulsa el botón otra vez.</li>
+          <li>El panel del carro sigue en la red <code>SeguidorLineaPID</code> (clave <code>linea1234</code>), <code>http://192.168.4.1</code>, solo para calibrar.</li>
         </ol>
       </section>
 
@@ -407,7 +420,8 @@ pre.proto{max-height:none}
 "use strict";
 /* =====================================================================
    AGV-01 · Página del carro de entrega (seguidor de línea)
-   - CARRO REAL: el ESP32 va por WiFi al servidor; esta página lo muestra y le manda órdenes (rol "agv_vista").
+   - CARRO REAL: el ESP32 habla por BLUETOOTH con esta página; un puente (BT) lo pasa al servidor como rol "agv"
+     y la página lo muestra y le manda órdenes (rol "agv_vista").
    - SIMULADOR: carro virtual con los mismos eventos (rol "agv").
    - Se comunica con el HMI por el servidor (rol "agv"):
        HMI → carro  {tipo:"agv_cmd", cmd:"despachar"|"vaso"|"paro", ...}
@@ -830,7 +844,7 @@ function pasoSimulador(dt){
 }
 
 /* =====================================================================
-   CARRO REAL (ESP32 por WiFi): todo llega por el servidor
+   CARRO REAL (ESP32 por Bluetooth, con el puente BT de abajo): todo llega por el servidor
    ===================================================================== */
 const ESP = { online:false, tel:null, sTel:0, tTel:0, movia:false, camposListos:false };
 function ctl(cmd, extra){
@@ -932,6 +946,132 @@ function conectarServidor(){
   };
 }
 
+/* =====================================================================
+   BLUETOOTH: puente carro ESP32 <-> servidor
+   El carro (BLE, servicio UART de Nordic) manda líneas JSON terminadas en "\n".
+   Esta página abre su PROPIA conexión al servidor con el rol "agv" (la que mandó el carro en su "hola")
+   y pasa los mensajes en los dos sentidos. Así el carro no usa el WiFi/internet.
+   ===================================================================== */
+const BT_SV = "6e400001-b5a3-f393-e0a9-e50e24dcca9e", BT_RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e", BT_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+const BT_AL_CARRO = ["hola_ok", "hmi", "error", "agv_permiso", "agv_ctl", "agv_cmd"];   // lo que le sirve al carro
+const BT = { dev:null, rx:null, tx:null, ws:null, buf:"", dec:null, hola:null, id:null, aprobado:false,
+             estado:"off", nombre:"", auto:false, cola:Promise.resolve(), reintento:null, ultimo:0 };
+function btPuede(){
+  if(!navigator.bluetooth){ toast("Este navegador no tiene Bluetooth. Abre la página en Chrome o Edge."); return false; }
+  if(!window.isSecureContext){ toast("El Bluetooth necesita el link seguro (https://…) de la nube."); return false; }
+  return true;
+}
+async function btConectar(){
+  if(!btPuede()) return;
+  if(BT.estado !== "off") return;
+  try{
+    BT.dev = await navigator.bluetooth.requestDevice({ filters:[{ namePrefix:"AGV" }, { services:[BT_SV] }], optionalServices:[BT_SV] });
+  }catch(e){ if(e && e.name !== "NotFoundError") toast("Bluetooth: " + e.message); return; }
+  BT.dev.addEventListener("gattserverdisconnected", btSeCorto);
+  BT.auto = true; BT.aprobado = false;
+  btAbrir();
+}
+async function btAbrir(){
+  clearTimeout(BT.reintento);
+  if(!BT.dev || BT.estado === "ok") return;
+  BT.estado = "conectando"; render();
+  try{
+    const g = await BT.dev.gatt.connect();
+    const sv = await g.getPrimaryService(BT_SV);
+    BT.rx = await sv.getCharacteristic(BT_RX);
+    BT.tx = await sv.getCharacteristic(BT_TX);
+    BT.tx.addEventListener("characteristicvaluechanged", btLlega);
+    await BT.tx.startNotifications();
+    BT.estado = "ok"; BT.nombre = BT.dev.name || "AGV"; BT.buf = ""; BT.dec = new TextDecoder();
+    log(`🔵 Carro conectado por Bluetooth (${BT.nombre}).`); toast("🔵 Carro conectado por Bluetooth");
+    btEscribir({ tipo:"bt_listo" });                       // el carro contesta con su "hola"
+  }catch(e){
+    BT.estado = "off";
+    try{ BT.dev.gatt.disconnect(); }catch(_){}
+    log("⚠ Bluetooth: no se pudo conectar (" + (e && e.message || e) + ").");
+    if(BT.auto) BT.reintento = setTimeout(btAbrir, 3000);
+  }
+  render();
+}
+function btSeCorto(){
+  if(BT.estado === "off" && !BT.ws) return;
+  BT.estado = "off"; btCerrarWs();
+  log("⚠ Se cortó el Bluetooth del carro." + (BT.auto ? " Reintentando…" : ""));
+  if(BT.auto){ toast("Se cortó el Bluetooth del carro. Reintentando…"); BT.reintento = setTimeout(btAbrir, 2000); }
+  render();
+}
+function btDesconectar(){
+  BT.auto = false; clearTimeout(BT.reintento);
+  btCerrarWs(); BT.estado = "off";
+  try{ if(BT.dev && BT.dev.gatt.connected) BT.dev.gatt.disconnect(); }catch(_){}
+  log("🔵 Bluetooth desconectado."); render();
+}
+/* carro -> página: pedazos de texto; se arman las líneas JSON */
+function btLlega(ev){
+  BT.ultimo = performance.now();
+  BT.buf += BT.dec.decode(ev.target.value, { stream:true });
+  let i;
+  while((i = BT.buf.indexOf("\n")) >= 0){
+    const linea = BT.buf.slice(0, i).trim(); BT.buf = BT.buf.slice(i + 1);
+    if(linea) btDelCarro(linea);
+  }
+  if(BT.buf.length > 8000) BT.buf = "";
+}
+function btDelCarro(linea){
+  let m; try{ m = JSON.parse(linea); }catch(_){ return; }
+  if(m.tipo === "pong") return;
+  if(m.tipo === "hola"){
+    m.sala = window.SALA;                                   // entra a la sala de esta página
+    BT.hola = m; BT.id = m.id || null;
+    if(BT.ws && BT.ws.readyState === 1) BT.ws.send(JSON.stringify(m)); else btAbrirWs();
+    return;
+  }
+  if(BT.ws && BT.ws.readyState === 1) BT.ws.send(linea);
+}
+/* página -> carro: en pedazos de 20 bytes (cabe en cualquier Bluetooth), uno tras otro */
+function btEscribir(o){
+  if(BT.estado !== "ok" || !BT.rx) return;
+  const datos = new TextEncoder().encode((typeof o === "string" ? o : JSON.stringify(o)) + "\n");
+  BT.cola = BT.cola.then(async () => {
+    for(let i = 0; i < datos.length; i += 20){
+      if(BT.estado !== "ok") return;
+      const p = datos.slice(i, i + 20);
+      if(BT.rx.writeValueWithResponse) await BT.rx.writeValueWithResponse(p); else await BT.rx.writeValue(p);
+    }
+  }).catch(e => log("⚠ Bluetooth: no se pudo mandar al carro (" + (e && e.message || e) + ")."));
+}
+/* conexión del puente con el servidor (como si fuera el carro) */
+function btAbrirWs(){
+  if(BT.ws || BT.estado !== "ok") return;
+  const url = urlServidor(); if(!url) return;
+  let ws; try{ ws = new WebSocket(url); }catch(_){ setTimeout(btAbrirWs, 3000); return; }
+  BT.ws = ws;
+  ws.onopen = () => { if(BT.hola) ws.send(JSON.stringify(BT.hola)); };
+  ws.onmessage = (e) => {
+    let tipo = ""; try{ tipo = JSON.parse(e.data).tipo; }catch(_){ return; }
+    if(BT_AL_CARRO.includes(tipo)) btEscribir(e.data);
+  };
+  ws.onclose = () => {
+    if(BT.ws !== ws) return;
+    BT.ws = null;
+    btEscribir({ tipo:"hmi", en_linea:false });
+    if(BT.estado === "ok") setTimeout(btAbrirWs, 3000);
+  };
+}
+function btCerrarWs(){
+  const ws = BT.ws; BT.ws = null;
+  if(ws){ ws.onclose = null; try{ ws.close(); }catch(_){} }
+}
+function pintarBt(){
+  const c = $("#chipBt"); if(!c) return;
+  c.classList.toggle("ok", BT.estado === "ok"); c.classList.toggle("con", BT.estado === "conectando");
+  const t = BT.estado === "ok" ? `🔵 Bluetooth: conectado a ${BT.nombre}` + (BT.ws && BT.ws.readyState === 1 ? " · pasando al servidor" : " · esperando al servidor…")
+          : BT.estado === "conectando" ? "🔵 Bluetooth: conectando…" : BT.auto ? "🔵 Bluetooth: se cortó, reintentando…" : "🔵 Bluetooth: sin conectar";
+  $("#btTxt").textContent = t;
+  $("#btnBt").hidden = BT.estado !== "off" || BT.auto; $("#btnBtOff").hidden = !(BT.estado !== "off" || BT.auto);
+}
+window.addEventListener("beforeunload", () => { try{ if(BT.dev && BT.dev.gatt.connected) BT.dev.gatt.disconnect(); }catch(_){} });
+
 /* ===== Permiso del carro físico (ESP32) para entrar a esta sala ===== */
 const PERM = { pendientes:[], conectado:null, pide:true, visto:new Set() };
 function permEsc(t){ return String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -964,7 +1104,9 @@ function deCarrosSala(m){
   PERM.pendientes = Array.isArray(m.pendientes) ? m.pendientes : [];
   PERM.conectado = m.conectado || null; PERM.pide = m.pide_permiso !== false;
   PERM.visto.forEach(id => { if(!PERM.pendientes.some(p => p.id === id)) PERM.visto.delete(id); });
-  PERM.pendientes.forEach(p => { if(!antes.has(p.id)) { log(`🚚 El carro físico "${p.nombre}" pide entrar a la sala.`); toast("Un carro físico pide permiso para entrar a tu sala."); } });
+  const miBt = BT.id && PERM.pendientes.find(p => p.id === BT.id);
+  if(miBt && !BT.aprobado){ BT.aprobado = true; PERM.visto.add(BT.id); permResponder(BT.id, true); log("🔵 El carro conectado por Bluetooth entra a la sala."); }
+  PERM.pendientes.forEach(p => { if(!antes.has(p.id) && p.id !== BT.id) { log(`🚚 El carro físico "${p.nombre}" pide entrar a la sala.`); toast("Un carro físico pide permiso para entrar a tu sala."); } });
   pintarPermiso();
 }
 
@@ -1098,11 +1240,12 @@ function render(){
   $("#hmiTxt").textContent = !SRV.abierto ? (urlServidor() ? "Conectando con el servidor…" : "Escribe la dirección del servidor.") : SRV.hmi ? "HMI: en línea" : "HMI: sin conexión (abre el HMI en la laptop de la rueda)";
   const t = ESP.tel;
   $("#espPill").textContent = ESP.online ? "EN LÍNEA" : "SIN CONEXIÓN"; $("#espPill").classList.toggle("ok", ESP.online);
-  $("#kvRed").textContent = t && t.ssid ? t.ssid : "—";
-  $("#kvIp").textContent = t && t.ip ? t.ip : "—";
+  $("#kvRed").textContent = t && t.bt ? "Bluetooth" : t && t.ssid ? "WiFi · " + t.ssid : "—";
+  $("#kvIp").textContent = BT.estado === "ok" ? BT.nombre : BT.estado === "conectando" ? "conectando…" : "sin conectar";
+  pintarBt();
   $("#kvModo").textContent = t ? (t.sim ? "Simulador (motores apagados)" : "Físico") : "—";
   $("#kvEstado").textContent = ESP.online ? (TXT[st.estado] || [st.estado])[0] : "—";
-  $("#espTxt").textContent = !SRV.abierto ? "Primero esta página debe conectarse al servidor." : ESP.online ? "✔ El carro está conectado y se comunica con el HMI y la tienda." : "El carro todavía no se conecta al servidor. Revisa los pasos de la derecha.";
+  $("#espTxt").textContent = !SRV.abierto ? "Primero esta página debe conectarse al servidor." : ESP.online ? "✔ El carro está conectado y se comunica con el HMI y la tienda." : (BT.estado === "ok" ? "Bluetooth conectado; esperando que el servidor acepte al carro…" : "Pulsa 🔵 Conectar carro por Bluetooth y elige AGV-CELDA.");
   $("#pie").textContent = `● ${MODO_SIM ? "MODO SIMULADOR" : "CARRO REAL (ESP32) · " + (ESP.online ? "en línea" : "sin conexión")} · ${SRV.abierto ? "servidor conectado" : "sin servidor"} · ${SRV.hmi ? "HMI en línea" : "HMI sin conexión"} · ${(TXT[st.estado] || [""])[0].toLowerCase()}`;
 }
 
@@ -1111,6 +1254,10 @@ function render(){
   dibujar();
   document.title = MODO_SIM ? "AGV-01 · SIMULADOR" : "AGV-01 · Carro real";
   $("#cardEsp").hidden = MODO_SIM; $("#cardPasos").hidden = MODO_SIM;
+  $("#chipBt").hidden = MODO_SIM;
+  $("#chipBt").addEventListener("click", () => BT.estado === "off" ? btConectar() : toast("El carro ya está conectado por Bluetooth."));
+  $("#btnBt").addEventListener("click", btConectar);
+  $("#btnBtOff").addEventListener("click", btDesconectar);
   $("#marcaSub").textContent = MODO_SIM ? "SIMULADOR" : "CARRO DE ENTREGA";
   const cm = $("#chipModo"); cm.textContent = MODO_SIM ? "MODO SIMULADOR" : "CARRO REAL"; cm.classList.toggle("fisico", !MODO_SIM);
   cm.addEventListener("click", () => cambiarModo(!MODO_SIM));
@@ -1122,7 +1269,7 @@ function render(){
   });
   $("#commSub").textContent = MODO_SIM
     ? "Modo simulador: el carro es virtual. Igual se comunica de verdad con el HMI por el servidor. (Si el carro ESP32 está encendido y conectado, apágalo: solo puede haber un carro.)"
-    : "Carro real: el ESP32 se conecta solo al servidor por WiFi. Esta página solo lo muestra y le manda órdenes; no necesitas conectarte a la red del carro.";
+    : "Carro real: el ESP32 se conecta por Bluetooth a esta página (botón 🔵 Conectar carro por Bluetooth) y ella pasa todo al servidor. No usa el internet del carro.";
   $$(".tab").forEach(t => t.addEventListener("click", () => {
     $$(".tab").forEach(x => x.classList.toggle("on", x === t));
     $("#vCarro").hidden = t.dataset.v !== "vCarro"; $("#vComm").hidden = t.dataset.v !== "vComm";
